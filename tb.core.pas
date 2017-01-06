@@ -5,30 +5,16 @@ unit tb.Core;
 interface
 
 uses
-  Classes, SysUtils, tb.Config;
+  Classes, SysUtils, tb.Config, Logger, ts.Connection;
 
 type
-
-  { TLogger }
-
-  TLogger = class
-  private
-    FLog: TextFile;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    procedure WriteError(ErrNo: integer; Err: string);
-    procedure WriteHint(Hint: string);
-    procedure WriteWarning(Warning: string);
-    procedure WriteStatus(Status: string);
-  end;
 
   { TTBCore }
 
   TTBCore = class(TThread)
   private
-    FLogger: TLogger;
     FConfig: TConfig;
+    FConnection: TTsConnection;
     { Private declarations }
   protected
     { Protected declarations }
@@ -44,73 +30,44 @@ const
 
 implementation
 
-{ TLogger }
-
-constructor TLogger.Create;
-begin
-  {$IfDef Debug}
-  FLog:=StdOut;
-  {$Else}
-  AssignFile(FLog, SLogPath);
-  Append(FLog);
-  {$EndIf}
-  WriteLn(FLog, '--------------Start of Service--------------');
-end;
-
-destructor TLogger.Destroy;
-begin
-  WriteLn(FLog, '-----------------End of Log-----------------');
-  {$IfNDef Debug}
-  CloseFile(FLog);
-  {$EndIf}
-  inherited Destroy;
-end;
-
-procedure TLogger.WriteError(ErrNo: integer; Err: string);
-begin
-  WriteLn(FLog, Format('[Error No%d][%s]%s', [ErrNo, DateTimeToStr(Now), Err]));
-  Flush(FLog);
-end;
-
-procedure TLogger.WriteHint(Hint: string);
-begin
-  WriteLn(FLog, Format('[Hint][%s]%s', [DateTimeToStr(Now), Hint]));
-  Flush(FLog);
-end;
-
-procedure TLogger.WriteWarning(Warning: string);
-begin
-  WriteLn(FLog, Format('[Warning][%s]%s', [DateTimeToStr(Now), Warning]));
-  Flush(FLog);
-end;
-
-procedure TLogger.WriteStatus(Status: string);
-begin
-  WriteLn(FLog, Format('[%s]%s', [DateTimeToStr(Now), Status]));
-  Flush(FLog);
-end;
-
 { TTBCore }
 
 procedure TTBCore.Execute;
 begin
   FConfig := ReadConfig(SConfPath);
-  { TODO : Thread Loop }
+  FConnection:=TTsConnection.Create(FConfig.IPAddress, FConfig.Port);
+  try
+    FConnection.Connect();
+    Sleep(100);
+    if FConnection.LogIn(FConfig.Username, FConfig.Password) then
+    begin
+    Sleep(100);
+    FConnection.LogOut;
+    Sleep(100);
+    end;
+    FConnection.Disconnect();
+    Sleep(100);
+  finally
   WriteConfig(SConfPath, FConfig);
+  end;
 end;
 
 constructor TTBCore.Create(AOnTerminate: TNotifyEvent);
 begin
   FreeOnTerminate := True;
   OnTerminate := AOnTerminate;
-  FLogger := TLogger.Create;
+  {$IfDef DEBUG}
+  CreateDebugLogger;
+  {$Else}
+  CreateFileLogger(SLogPath);
+  {$EndIf}
 
   inherited Create(False);
 end;
 
 destructor TTBCore.Destroy;
 begin
-  FLogger.Free;
+  DestroyLogger;
   inherited Destroy;
 end;
 

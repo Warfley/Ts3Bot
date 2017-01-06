@@ -30,7 +30,7 @@
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
-            <OtherUnitFiles Value="TsLib"/>
+            <OtherUnitFiles Value="TsLib;Common"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
           <Parsing>
@@ -110,7 +110,7 @@
         <PackageName Value="FCL"/>
       </Item4>
     </RequiredPackages>
-    <Units Count="6">
+    <Units Count="7">
       <Unit0>
         <Filename Value="TsBot.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -145,6 +145,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="ts.Connection"/>
       </Unit5>
+      <Unit6>
+        <Filename Value="Common\logger.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Logger"/>
+      </Unit6>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

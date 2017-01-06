@@ -7,7 +7,7 @@ Uses
   CThreads,
 {$ENDIF}{$ENDIF}
   DaemonApp, lazdaemonapp, tb.DaemonMapper, tb.BotDaemon, tb.core, indylaz,
-  ts.Connection
+  ts.Connection, Logger
   { add your units here };
 
 begin
