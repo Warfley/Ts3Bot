@@ -1,6 +1,7 @@
 object BotDaemon: TBotDaemon
-  OldCreateOrder = True
+  OldCreateOrder = False
   OnStart = DataModuleStart
+  OnStop = DataModuleStop
   Height = 150
   HorizontalOffset = 1370
   VerticalOffset = 175
