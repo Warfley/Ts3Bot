@@ -12,6 +12,9 @@ type
   { TBotDaemon }
 
   TBotDaemon = class(TDaemon)
+    procedure DataModuleContinue(Sender: TCustomDaemon; var OK: Boolean);
+    procedure DataModulePause(Sender: TCustomDaemon; var OK: Boolean);
+    procedure DataModuleShutDown(Sender: TCustomDaemon);
     procedure DataModuleStart(Sender: TCustomDaemon; var OK: boolean);
     procedure DataModuleStop(Sender: TCustomDaemon; var OK: boolean);
   private
@@ -35,6 +38,26 @@ end;
 {$R *.lfm}
 
 { TBotDaemon }
+
+procedure TBotDaemon.DataModuleContinue(Sender: TCustomDaemon; var OK: Boolean);
+begin
+  OK:=Assigned(FThread);
+  if OK then
+    FThread.Resume;
+end;
+
+procedure TBotDaemon.DataModulePause(Sender: TCustomDaemon; var OK: Boolean);
+begin
+  OK:=Assigned(FThread);
+  if OK then
+    FThread.Suspend;
+end;
+
+procedure TBotDaemon.DataModuleShutDown(Sender: TCustomDaemon);
+var ok:Boolean;
+begin
+  DataModuleStop(Sender, ok);
+end;
 
 procedure TBotDaemon.DataModuleStart(Sender: TCustomDaemon; var OK: boolean);
 begin
