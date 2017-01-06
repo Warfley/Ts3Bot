@@ -30,6 +30,7 @@
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
+            <OtherUnitFiles Value="TsLib"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
           <Parsing>
@@ -95,18 +96,21 @@
         <CommandLineParams Value="--run"/>
       </local>
     </RunParams>
-    <RequiredPackages Count="3">
+    <RequiredPackages Count="4">
       <Item1>
-        <PackageName Value="LazDaemon"/>
+        <PackageName Value="indylaz"/>
       </Item1>
       <Item2>
-        <PackageName Value="LCL"/>
+        <PackageName Value="LazDaemon"/>
       </Item2>
       <Item3>
-        <PackageName Value="FCL"/>
+        <PackageName Value="LCL"/>
       </Item3>
+      <Item4>
+        <PackageName Value="FCL"/>
+      </Item4>
     </RequiredPackages>
-    <Units Count="4">
+    <Units Count="6">
       <Unit0>
         <Filename Value="TsBot.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -131,6 +135,16 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="tb.Core"/>
       </Unit3>
+      <Unit4>
+        <Filename Value="tb.config.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="tb.Config"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="TsLib\ts.connection.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="ts.Connection"/>
+      </Unit5>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
