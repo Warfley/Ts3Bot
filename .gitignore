@@ -31,3 +31,6 @@ lib/
 
 # Bot Config file
 .tbconf
+
+# Heaptrc File
+heap.trc

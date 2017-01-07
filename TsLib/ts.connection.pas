@@ -5,7 +5,15 @@ unit ts.Connection;
 interface
 
 uses
-  Classes, SysUtils, Interfaces, IdGlobal, IdException, IdTelnet, fgl, Logger;
+  Classes, SysUtils,
+  // Required for indy
+  Interfaces,
+  // indy
+  IdGlobal, IdException, IdTelnet, IdStack,
+  // reciever list
+  fgl,
+  // Log
+  Logger;
 
 type
 
@@ -25,7 +33,6 @@ type
 
   TTsConnection = class
   private
-    CheckLocked: boolean;
     TelnetConnection: TIdTelnet;
     Recievers: TRecieveList;
     FOnConnected: TNotifyEvent;
@@ -46,12 +53,12 @@ type
   public
     constructor Create(Host: string; Port: integer);
     destructor Destroy; override;
-    procedure Connect;
+    function Connect: Boolean;
     procedure Disconnect;
     procedure AddReciever(Reciever: TRecieveEvent);
     procedure DeleteReciever(Reciever: TRecieveEvent);
     procedure SendCommand(Cmd: string);
-    function CommandWithResponse(Cmd: string): TStatusResponse;
+    function ExecCommand(Cmd: string): TStatusResponse;
     function LogIn(Username, Password: string): boolean;
     procedure LogOut;
 
@@ -183,7 +190,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TTsConnection.Connect;
+function TTsConnection.Connect: Boolean;
 begin
   // Already connected?
   if Connected then
@@ -192,7 +199,14 @@ begin
   WriteStatus(Format('Connecting to %s:%d', [TelnetConnection.Host,
     TelnetConnection.Port]));
   // Connect to Server
-  TelnetConnection.Connect;
+  try
+    TelnetConnection.Connect;
+  except
+    on e: EIdSocketError do WriteError(100, e.Message);
+    on e: Exception do WriteError(1, e.Message);
+  end;
+
+  Result:=TelnetConnection.Connected;
 end;
 
 procedure TTsConnection.Disconnect;
@@ -234,7 +248,7 @@ begin
 
 end;
 
-function TTsConnection.CommandWithResponse(Cmd: string): TStatusResponse;
+function TTsConnection.ExecCommand(Cmd: string): TStatusResponse;
 var
   i: integer;
 begin
@@ -276,7 +290,7 @@ begin
   // Already logged in?
   if LoggedIn then
     exit;
-  err:= CommandWithResponse(Format('login %s %s', [Username, Password]));
+  err:= ExecCommand(Format('login %s %s', [Username, Password]));
   Result:=err.ErrNo=0;
   FLoggedIn:=Result;
   // Write Log
@@ -294,7 +308,7 @@ begin
   // Already logged in?
   if not LoggedIn then
     exit;
-  err:= CommandWithResponse('logout');
+  err:= ExecCommand('logout');
   res:=err.ErrNo=0;
   FLoggedIn:=false;
   // Write Log

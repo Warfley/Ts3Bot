@@ -28,7 +28,10 @@ begin
   if FileOpend then Exit;
   DbgLog:=False;
   AssignFile(LogFile, Path);
-  Append(LogFile);
+  if FileExists(Path) then
+    Append(LogFile)
+  else
+    Rewrite(LogFile);
   WriteLn(LogFile, '--------------Start of Service--------------');
   FileOpend:=True;
 end;
