@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectGroup FileVersion="1">
-    <Targets Count="1">
+    <Targets Count="2">
       <Target0 FileName="BotDaemon.lpi">
         <BuildModes Count="3"/>
         <Mode1 Name="Default"/>
         <Mode2 Name="Debug"/>
         <Mode3 Name="Release"/>
       </Target0>
+      <Target1 FileName="BotApp.lpi">
+        <BuildModes Count="1"/>
+        <Mode1 Name="Default"/>
+      </Target1>
     </Targets>
   </ProjectGroup>
 </CONFIG>
