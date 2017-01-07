@@ -1,4 +1,4 @@
-unit tb.Config;
+unit TsBot.config;
 
 {$mode objfpc}{$H+}
 
@@ -13,36 +13,61 @@ type
     Password,
     IPAddress: string;
     Port: integer;
+    ServerID: integer;
+    LogPath: string;
   end;
 
 const
   DefaultConf: TConfig = (Username: 'User'; Password: 'Pass';
-    IPAddress: '127.0.0.1'; Port: 10011);
+    IPAddress: '127.0.0.1'; Port: 10011; ServerID: 1;
+    LogPath: {$IfDef DEBUG}'./log.txt'{$Else}''{$EndIf});
   ConfigVersion = 1;
 
-function ReadConfig(Path: String): TConfig;
-procedure WriteConfig(Path: String; Config: TConfig);
+function ReadConfig(Path: string): TConfig;
+procedure WriteConfig(Path: string; Config: TConfig);
+
 implementation
 
 uses DOM, XMLRead, XMLWrite;
 
-function ReadConfig(Path: String): TConfig;
+function ReadConfig(Path: string): TConfig;
 
   procedure ReadLoginData(Doc: TXMLDocument);
   var
     Node: TDOMElement;
+    attr: string;
   begin
     Node := Doc.DocumentElement.FindNode('Login') as TDOMElement;
     if not Assigned(Node) then
       Exit;
-    Result.IPAddress := AnsiString(Node.AttribStrings['IP']);
-    Result.Port := StrToInt(Node.AttribStrings['Port']);
+    // IP
+    attr := Node.AttribStrings['IP'];
+    if Length(attr) > 0 then
+      Result.IPAddress := attr;
+    // Port
+    attr := Node.AttribStrings['Port'];
+    if Length(attr) > 0 then
+      Result.Port := StrToInt(attr);
+    // ServerID
+    attr := Node.AttribStrings['ServerID'];
+    if Length(attr) > 0 then
+      Result.ServerID := StrToInt(attr);
+    // ServerID
+    attr := Node.AttribStrings['LogFile'];
+    if Length(attr) > 0 then
+      Result.LogPath := attr;
 
     Node := Node.FindNode('User') as TDOMElement;
     if not Assigned(Node) then
       Exit;
-    Result.Username := Node.AttribStrings['User'];
-    Result.Password := Node.AttribStrings['Pass'];
+    // Password
+    attr := Node.AttribStrings['Pass'];
+    if Length(attr) > 0 then
+      Result.Password := attr;
+    // User
+    attr := Node.AttribStrings['User'];
+    if Length(attr) > 0 then
+      Result.Username := attr;
   end;
 
 var
@@ -59,7 +84,7 @@ begin
   end;
 end;
 
-procedure WriteConfig(Path: String; Config: TConfig);
+procedure WriteConfig(Path: string; Config: TConfig);
 var
   doc: TXMLDocument;
   RootNode, ParentNode, DataNode: TDOMNode;
@@ -77,6 +102,9 @@ begin
     // Adding connection Attributes
     TDOMElement(ParentNode).SetAttribute('IP', Config.IPAddress);
     TDOMElement(ParentNode).SetAttribute('Port', IntToStr(Config.Port));
+    TDOMElement(ParentNode).SetAttribute('ServerID', IntToStr(Config.ServerID));
+    if Length(Config.LogPath) > 0 then
+      TDOMElement(ParentNode).SetAttribute('LogFile', Config.LogPath);
 
     // Adding Userdata
     DataNode := doc.CreateElement('User');
@@ -92,4 +120,3 @@ begin
 end;
 
 end.
-

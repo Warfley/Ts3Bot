@@ -30,7 +30,7 @@ lib/
 *.app/
 
 # Bot Config file
-.tbconf
+config
 
 # Heaptrc File
 heap.trc

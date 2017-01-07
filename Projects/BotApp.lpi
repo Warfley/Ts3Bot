@@ -105,28 +105,41 @@
         <PackageName Value="indylaz"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="5">
+    <Units Count="7">
       <Unit0>
         <Filename Value="BotApp.lpr"/>
         <IsPartOfProject Value="True"/>
       </Unit0>
       <Unit1>
-        <Filename Value="..\Bot\tb.config.pas"/>
+        <Filename Value="..\Bot\tsbot.config.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="TsBot.config"/>
       </Unit1>
       <Unit2>
-        <Filename Value="..\Bot\tb.core.pas"/>
+        <Filename Value="..\Bot\tsbot.core.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="tb.Core"/>
+        <UnitName Value="TsBot.core"/>
       </Unit2>
       <Unit3>
         <Filename Value="..\Common\logger.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="Logger"/>
       </Unit3>
       <Unit4>
-        <Filename Value="..\TsLib\ts.connection.pas"/>
+        <Filename Value="..\TsLib\tslib.connection.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="TsLib.connection"/>
       </Unit4>
+      <Unit5>
+        <Filename Value="..\TsLib\tslib.notifications.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsLib.notifications"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="..\TsLib\tslib.types.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsLib.Types"/>
+      </Unit6>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

@@ -1,4 +1,4 @@
-unit ts.Connection;
+unit TsLib.connection;
 
 {$mode objfpc}{$H+}
 
@@ -6,28 +6,15 @@ interface
 
 uses
   Classes, SysUtils,
+  TsLib.Types,
   // Required for indy
   Interfaces,
   // indy
   IdGlobal, IdException, IdTelnet, IdStack,
-  // reciever list
-  fgl,
   // Log
   Logger;
 
 type
-
-  TTsConnection = class;
-
-  TRecieveEvent = function(Sender: TTsConnection; Data: string;
-    var RemoveFromList: boolean): boolean of object;
-
-  TRecieveList = specialize TFPGList<TRecieveEvent>;
-
-  TStatusResponse = record
-    ErrNo: integer;
-    Msg: string;
-  end;
 
   { TTsConnection }
 
@@ -41,7 +28,8 @@ type
     FOnLogin: TNotifyEvent;
     FWaitingForStatus: boolean;
     FLastError: TStatusResponse;
-    function RecieveStatus(Sender: TTsConnection; Data: string;
+    FServerID: Integer;
+    function RecieveStatus(Sender: TObject; Data: string;
       var RemoveFromList: boolean): boolean;
     function getConnected: boolean;
     function GetLoggedIn: boolean;
@@ -60,6 +48,7 @@ type
     procedure SendCommand(Cmd: string);
     function ExecCommand(Cmd: string): TStatusResponse;
     function LogIn(Username, Password: string): boolean;
+    function SwitchServer(NewSID: Integer): Boolean;
     procedure LogOut;
 
     property OnConnected: TNotifyEvent read FOnConnected write FOnConnected;
@@ -67,6 +56,7 @@ type
     property Connected: boolean read getConnected;
     property LoggedIn: boolean read GetLoggedIn;
     property OnLogin: TNotifyEvent read FOnLogin write FOnLogin;
+    property ServerID: Integer read FServerID;
   end;
 
 implementation
@@ -85,7 +75,23 @@ begin
   Result := FLoggedIn;
 end;
 
-function TTsConnection.RecieveStatus(Sender: TTsConnection; Data: string;
+function TTsConnection.SwitchServer(NewSID: Integer): Boolean;
+var
+  res: TStatusResponse;
+begin
+  if not Connected or (FServerID=NewSID) then Exit;
+  res := ExecCommand(Format('use %d', [NewSID]));
+  Result:=res.ErrNo = 0;
+  if Result then
+  begin
+    FServerID:=NewSID;
+    WriteStatus(Format('Switched to server %d', [NewSID]));
+  end
+  else
+    WriteError(res.ErrNo, res.Msg);
+end;
+
+function TTsConnection.RecieveStatus(Sender: TObject; Data: string;
   var RemoveFromList: boolean): boolean;
 begin
   Data:=Trim(Data);
@@ -102,7 +108,7 @@ begin
   FLastError.ErrNo := StrToInt(Copy(Data, 1, Pos(' ', Data)-1));
   // Get the Message
   Delete(Data, 1, Pos('=', Data));
-  FLastError.Msg := Data;
+  FLastError.Msg := Trim(Data);
 
   // Take away the reciever and the message
   Result := True;
@@ -262,8 +268,8 @@ begin
   // Send command
   SendCommand(Cmd);
 
-  // Wait at most 5 Seconds for a result
-  for i := 1 to 50 do
+  // Wait at most 2 Seconds for a result
+  for i := 1 to 20 do
   begin
     Sleep(100);
     if not FWaitingForStatus then // Result found
@@ -278,6 +284,9 @@ begin
     FLastError.ErrNo := -1;
     FLastError.Msg := 'No response recieved';
   end;
+
+  if FLastError.ErrNo<>0 then
+    WriteError(FLastError.ErrNo, FLastError.Msg);
 
   // Return result
   Result := FLastError;
