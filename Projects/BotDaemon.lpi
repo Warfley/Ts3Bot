@@ -138,21 +138,23 @@
       <Unit4>
         <Filename Value="..\TsLib\tslib.connection.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="TsLib.connection"/>
       </Unit4>
       <Unit5>
-        <Filename Value="..\TsLib\tslib.notifications.pas"/>
+        <Filename Value="..\TsLib\tslib.types.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="TsLib.Types"/>
       </Unit5>
       <Unit6>
-        <Filename Value="..\TsLib\tslib.types.pas"/>
+        <Filename Value="..\Bot\tsbot.config.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit6>
       <Unit7>
-        <Filename Value="..\Bot\tsbot.config.pas"/>
+        <Filename Value="..\Bot\tsbot.core.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit7>
       <Unit8>
-        <Filename Value="..\Bot\tsbot.core.pas"/>
+        <Filename Value="..\TsLib\tslib.notificationmanager.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit8>
     </Units>

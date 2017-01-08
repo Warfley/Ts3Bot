@@ -10,7 +10,7 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils, TsBot.core, TsLib.notifications, TsLib.Types
+  Classes, sysutils, TsBot.core, TsLib.NotificationManager, TsLib.Types, unit1
   { you can add units after this };
 
 var Bot: TTBCore;
@@ -32,7 +32,11 @@ begin
   m.Code:=@ThreadStopped;
   m.Data:=Nil;
   Bot:=TTBCore.Create(TNotifyEvent(m), './config');
-  while Assigned(Bot) and not Bot.Finished do Sleep(200);
+  while Assigned(Bot) and not Bot.Finished do
+  begin
+    Sleep(200);
+    CheckSynchronize();
+  end;
   if Assigned(Bot) and Bot.Finished then FreeAndNil(Bot);
   ReadLn;
 end.

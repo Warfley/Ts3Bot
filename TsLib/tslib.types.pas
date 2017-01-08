@@ -14,24 +14,7 @@ type
 
   TRecieveList = specialize TFPGList<TRecieveEvent>;
 
-  TNotificationType = (ntChannelMv=0, ntServer=1, ntChannelMessage=2, ntPersonalMessage=3, ntServerMessage=4);
-
-  TNotificationEventType = (netChannel=0, netServer=1, netChannelMessage=2, netPersonalMessage=3, netServerMessage=4);
-
-  TNotificationEvent = procedure(Sender: TObject; AType: TNotificationType;
-    AData: TStringList);
-
-  TNotifyEventList = specialize TFPGList<TNotificationEvent>;
-
-  TNotifyEventMap = array[Low(TNotificationEventType)..High(TNotificationEventType)]
-    of TNotifyEventList;
-
-  TNotificationData = record
-    NType: TNotificationType;
-    Data: String;
-  end;
-
-  TNotificationList = specialize TVector<TNotificationData>;
+  {$Include include/NotificationTypes.inc}
 
   TIntegerList = specialize TFPGList<Integer>;
 
@@ -46,8 +29,20 @@ implementation
 
 function GetNotificationType(Str: String): TNotificationType;
 begin
-  if Str='notifyclientmoved' then
-    Result:=ntChannelMv;
+  if Str='notifytextmessage' then
+    Result:=ntTextMessage
+  else if Str='notifyserveredited' then
+    Result:=ntServerEdited
+  else if Str='notifyclientmoved' then
+    Result:=ntClientMoved
+  else if Str='notifyclientleftview' then
+    Result:=ntClientDisconnected
+  else if Str='notifycliententerview' then
+    Result:=ntClientConnected
+  else if Str='notifychanneledited' then
+    Result:=ntChannelEdited
+  else if Str='notifychanneldescriptionchanged' then
+    Result:=ntChanneldescriptionChanged;
 end;
 
 end.

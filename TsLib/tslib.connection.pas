@@ -12,7 +12,9 @@ uses
   // indy
   IdGlobal, IdException, IdTelnet, IdStack,
   // Log
-  Logger;
+  Logger,
+  // Critical sections
+  syncobjs;
 
 type
 
@@ -20,6 +22,8 @@ type
 
   TTsConnection = class
   private
+    FRecieverThread: TThread;
+    FRecieversThreaded: boolean;
     TelnetConnection: TIdTelnet;
     Recievers: TRecieveList;
     FOnConnected: TNotifyEvent;
@@ -28,11 +32,14 @@ type
     FOnLogin: TNotifyEvent;
     FWaitingForStatus: boolean;
     FLastError: TStatusResponse;
-    FServerID: Integer;
+    FServerID: integer;
+    FSyncData, FSyncRecievers: TRTLCriticalSection;
+    FIncomeData: string;
     function RecieveStatus(Sender: TObject; Data: string;
       var RemoveFromList: boolean): boolean;
     function getConnected: boolean;
     function GetLoggedIn: boolean;
+    procedure SendDataToReciever;
   protected
     procedure TelnetCommand(Sender: TIdTelnet; Status: TIdTelnetCommand);
     procedure TelnetConnected(Sender: TObject);
@@ -41,14 +48,14 @@ type
   public
     constructor Create(Host: string; Port: integer);
     destructor Destroy; override;
-    function Connect: Boolean;
+    function Connect: boolean;
     procedure Disconnect;
     procedure AddReciever(Reciever: TRecieveEvent);
     procedure DeleteReciever(Reciever: TRecieveEvent);
     procedure SendCommand(Cmd: string);
     function ExecCommand(Cmd: string): TStatusResponse;
     function LogIn(Username, Password: string): boolean;
-    function SwitchServer(NewSID: Integer): Boolean;
+    function SwitchServer(NewSID: integer): boolean;
     procedure LogOut;
 
     property OnConnected: TNotifyEvent read FOnConnected write FOnConnected;
@@ -56,7 +63,9 @@ type
     property Connected: boolean read getConnected;
     property LoggedIn: boolean read GetLoggedIn;
     property OnLogin: TNotifyEvent read FOnLogin write FOnLogin;
-    property ServerID: Integer read FServerID;
+    property ServerID: integer read FServerID;
+    property RecieverThread: TThread read FRecieverThread write FRecieverThread;
+    property RecieversThreaded: boolean read FRecieversThreaded write FRecieversThreaded;
   end;
 
 implementation
@@ -75,16 +84,44 @@ begin
   Result := FLoggedIn;
 end;
 
-function TTsConnection.SwitchServer(NewSID: Integer): Boolean;
+procedure TTsConnection.SendDataToReciever;
+var
+  i: integer;
+  Remove, DoBreak: boolean;
+begin
+  EnterCriticalsection(FSyncRecievers);
+  try
+    // Send to every Reciever
+    i := 0;
+    while i < Recievers.Count do
+    begin
+      Remove := Assigned(Recievers[i]);
+      if Remove then
+        DoBreak := Recievers[i](Self, FIncomeData, Remove);
+      // Delete Reciever afterwards
+      if Remove then
+        Recievers.Delete(i)
+      else if DoBreak then // Delete messega afterwards
+        break
+      else
+        Inc(i);
+    end;
+  finally
+    LeaveCriticalsection(FSyncRecievers);
+  end;
+end;
+
+function TTsConnection.SwitchServer(NewSID: integer): boolean;
 var
   res: TStatusResponse;
 begin
-  if not Connected or (FServerID=NewSID) then Exit;
+  if not Connected or (FServerID = NewSID) then
+    Exit;
   res := ExecCommand(Format('use %d', [NewSID]));
-  Result:=res.ErrNo = 0;
+  Result := res.ErrNo = 0;
   if Result then
   begin
-    FServerID:=NewSID;
+    FServerID := NewSID;
     WriteStatus(Format('Switched to server %d', [NewSID]));
   end
   else
@@ -94,7 +131,7 @@ end;
 function TTsConnection.RecieveStatus(Sender: TObject; Data: string;
   var RemoveFromList: boolean): boolean;
 begin
-  Data:=Trim(Data);
+  Data := Trim(Data);
   if not AnsiStartsStr('error id=', Data) then
   begin
     // Not Processed
@@ -105,7 +142,7 @@ begin
 
   // Get the number
   Delete(Data, 1, 9);
-  FLastError.ErrNo := StrToInt(Copy(Data, 1, Pos(' ', Data)-1));
+  FLastError.ErrNo := StrToInt(Copy(Data, 1, Pos(' ', Data) - 1));
   // Get the Message
   Delete(Data, 1, Pos('=', Data));
   FLastError.Msg := Trim(Data);
@@ -134,25 +171,20 @@ end;
 procedure TTsConnection.TelnetDataAvailable(Sender: TIdTelnet; const Buffer: TIdBytes);
 var
   Response: string;
-  i: integer;
-  Remove, DoBreak: boolean;
 begin
-  // Load Data as String
-  SetString(Response, PAnsiChar(Buffer), Length(Buffer));
-  // Send to every Reciever
-  i := 0;
-  while i < Recievers.Count do
-  begin
-    Remove := Assigned(Recievers[i]);
-    if Remove then
-      DoBreak := Recievers[i](Self, Response, Remove);
-    // Delete Reciever afterwards
-    if Remove then
-      Recievers.Delete(i)
-    else if DoBreak then // Delete messega afterwards
-      break
+  // Lock data
+  EnterCriticalsection(FSyncData);
+  try
+    // Load Data as String
+    SetString(FIncomeData, PAnsiChar(Buffer), Length(Buffer));
+    // Check if threaded
+    if RecieversThreaded then
+      SendDataToReciever // Send in seperate thread
     else
-      Inc(i);
+      TThread.Synchronize(RecieverThread, @SendDataToReciever);
+    // Send in event Thread
+  finally
+    LeaveCriticalsection(FSyncData);
   end;
 end;
 
@@ -166,6 +198,10 @@ end;
 
 constructor TTsConnection.Create(Host: string; Port: integer);
 begin
+  FRecieverThread := TThread.CurrentThread;
+  FRecieversThreaded := True;
+  InitCriticalSection(FSyncData);
+  InitCriticalSection(FSyncRecievers);
   WriteStatus('Setting up Telnet Client');
   // Initializing Reciever List
   Recievers := TRecieveList.Create;
@@ -193,10 +229,13 @@ begin
     Disconnect;
   // Clean up Memory
   Recievers.Free;
+  DoneCriticalsection(FSyncData);
+  DoneCriticalsection(FSyncRecievers);
+  TelnetConnection.Free;
   inherited Destroy;
 end;
 
-function TTsConnection.Connect: Boolean;
+function TTsConnection.Connect: boolean;
 begin
   // Already connected?
   if Connected then
@@ -208,11 +247,13 @@ begin
   try
     TelnetConnection.Connect;
   except
-    on e: EIdSocketError do WriteError(100, e.Message);
-    on e: Exception do WriteError(1, e.Message);
+    on e: EIdSocketError do
+      WriteError(100, e.Message);
+    on e: Exception do
+      WriteError(1, e.Message);
   end;
 
-  Result:=TelnetConnection.Connected;
+  Result := TelnetConnection.Connected;
 end;
 
 procedure TTsConnection.Disconnect;
@@ -234,13 +275,23 @@ end;
 
 procedure TTsConnection.AddReciever(Reciever: TRecieveEvent);
 begin
-  if Recievers.IndexOf(Reciever) < 0 then
-    Recievers.Add(Reciever);
+  EnterCriticalsection(FSyncRecievers);
+  try
+    if Recievers.IndexOf(Reciever) < 0 then
+      Recievers.Add(Reciever);
+  finally
+    LeaveCriticalsection(FSyncRecievers);
+  end;
 end;
 
 procedure TTsConnection.DeleteReciever(Reciever: TRecieveEvent);
 begin
-  Recievers.Remove(Reciever);
+  EnterCriticalsection(FSyncRecievers);
+  try
+    Recievers.Remove(Reciever);
+  finally
+    LeaveCriticalsection(FSyncRecievers);
+  end;
 end;
 
 procedure TTsConnection.SendCommand(Cmd: string);
@@ -285,7 +336,7 @@ begin
     FLastError.Msg := 'No response recieved';
   end;
 
-  if FLastError.ErrNo<>0 then
+  if FLastError.ErrNo <> 0 then
     WriteError(FLastError.ErrNo, FLastError.Msg);
 
   // Return result
@@ -299,32 +350,32 @@ begin
   // Already logged in?
   if LoggedIn then
     exit;
-  err:= ExecCommand(Format('login %s %s', [Username, Password]));
-  Result:=err.ErrNo=0;
-  FLoggedIn:=Result;
+  err := ExecCommand(Format('login %s %s', [Username, Password]));
+  Result := err.ErrNo = 0;
+  FLoggedIn := Result;
   // Write Log
   if Result then
     WriteStatus('Login successful')
   else
-    WriteStatus('Login failed ' +err.Msg);
+    WriteStatus('Login failed ' + err.Msg);
 end;
 
 procedure TTsConnection.LogOut;
 var
   err: TStatusResponse;
-  res: Boolean;
+  res: boolean;
 begin
   // Already logged in?
   if not LoggedIn then
     exit;
-  err:= ExecCommand('logout');
-  res:=err.ErrNo=0;
-  FLoggedIn:=false;
+  err := ExecCommand('logout');
+  res := err.ErrNo = 0;
+  FLoggedIn := False;
   // Write Log
   if res then
     WriteStatus('Logout successful')
   else
-    WriteStatus('Logout failed ' +err.Msg);
+    WriteStatus('Logout failed ' + err.Msg);
 end;
 
 end.
