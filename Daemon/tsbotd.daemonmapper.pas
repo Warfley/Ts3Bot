@@ -1,11 +1,11 @@
-unit tb.DaemonMapper;
+unit TsBotD.daemonmapper;
 
 {$mode objfpc}{$H+}
 
 interface
 
 uses
-  Classes, SysUtils, FileUtil, DaemonApp, tb.BotDaemon;
+  Classes, SysUtils, FileUtil, DaemonApp, TsBotD.BotDaemon;
 
 type
   TDaemonMapper1 = class(TDaemonMapper)

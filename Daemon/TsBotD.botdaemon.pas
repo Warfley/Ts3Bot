@@ -1,11 +1,11 @@
-unit tb.BotDaemon;
+unit TsBotD.botdaemon;
 
 {$mode objfpc}{$H+}
 
 interface
 
 uses
-  Classes, SysUtils, FileUtil, DaemonApp, tb.Core;
+  Classes, SysUtils, FileUtil, DaemonApp, TsBot.Core;
 
 type
 
@@ -63,7 +63,7 @@ procedure TBotDaemon.DataModuleStart(Sender: TCustomDaemon; var OK: boolean);
 begin
   OK := FThread = nil;
   if OK then
-    FThread := TTBCore.Create(@ThreadStopped);
+    FThread := TTBCore.Create(@ThreadStopped, './config');
 end;
 
 procedure TBotDaemon.DataModuleStop(Sender: TCustomDaemon; var OK: boolean);

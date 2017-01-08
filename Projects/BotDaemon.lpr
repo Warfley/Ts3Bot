@@ -6,8 +6,8 @@ Uses
 {$IFDEF UNIX}{$IFDEF UseCThreads}
   CThreads,
 {$ENDIF}{$ENDIF}
-  DaemonApp, sysutils, lazdaemonapp, tb.DaemonMapper, tb.BotDaemon, tb.core, indylaz,
-  ts.Connection, Logger
+  DaemonApp, sysutils, lazdaemonapp, TsBotD.DaemonMapper, TsBotD.BotDaemon, TsBot.core, indylaz,
+  TsLib.Connection, Logger
   { add your units here };
 
 begin
@@ -16,7 +16,7 @@ begin
     DeleteFile('heap.trc');
   SetHeapTraceOutput('heap.trc');
   {$EndIf}
-  Application.Title:='Teamspeak Bot Daemon';
+  Application.Title:='Daemon application';
   Application.Initialize;
   Application.Run;
 end.

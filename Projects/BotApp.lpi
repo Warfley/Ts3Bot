@@ -27,7 +27,7 @@
           <Version Value="11"/>
           <PathDelim Value="\"/>
           <Target>
-            <Filename Value="BotApp"/>
+            <Filename Value="../bin/$(TargetCPU)-$(TargetOS)/Debug/Ts3Bot"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
@@ -67,7 +67,7 @@
           <Version Value="11"/>
           <PathDelim Value="\"/>
           <Target>
-            <Filename Value="BotApp"/>
+            <Filename Value="../bin/$(TargetCPU)-$(TargetOS)/Release/Ts3Bot"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
