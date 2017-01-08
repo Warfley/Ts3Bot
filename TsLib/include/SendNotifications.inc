@@ -1,6 +1,6 @@
-  function CheckNSet(Val: String): Integer;
+  procedure CheckNSet(Val: String; out Result: Integer);
   begin
-    if not TryStrToInt(Result) then Result:=0;
+    if not TryStrToInt(Val, Result) then Result:=0;
   end;
 
   function CheckNSet(Val: String): Boolean;
@@ -8,7 +8,7 @@
     Result:=Val='1';
   end;
 
-  function CheckNSet(Val: String): String;
+  procedure CheckNSet(Val: String; out Result: String);
   var
     pos, i, len: Integer;
   begin
@@ -54,7 +54,7 @@
     SetLength(Result, pos);
   end;
 
-  function CheckNSet(Val: String): TFlagAvatar;
+  procedure CheckNSet(Val: String; out Result: TFlagAvatar);
   begin
     Result:='';
     if Length(Val)=32 then Result:=Val;
@@ -73,12 +73,12 @@
       sl.DelimitedText:=n.Data;
       with Data do
       begin
-        TargetMode := CheckNSet(sl.Values['targetmode']);
-        Message := CheckNSet(sl.Values['msg']);
-        Target := CheckNSet(sl.Values['target']);
-        SenderID := CheckNSet(sl.Values['invokerid']);
-        SenderName := CheckNSet(sl.Values['invokername']);
-        SenderUID := CheckNSet(sl.Values['invokeruid']);
+        CheckNSet(sl.Values['targetmode'], TargetMode);
+        CheckNSet(sl.Values['msg'], Message);
+        CheckNSet(sl.Values['target'], Target);
+        CheckNSet(sl.Values['invokerid'], SenderID);
+        CheckNSet(sl.Values['invokername'], SenderName);
+        CheckNSet(sl.Values['invokeruid'], SenderUID);
       end;
       // Send to every registered event
       for i:=0 to Events.Texts.Count-1 do
@@ -104,8 +104,8 @@
         { TODO : TODO }
       end;
       // Send to every registered event
-      for i:=0 to Events.Texts.Count-1 do
-        Events.Texts[i](Self, Data);
+      for i:=0 to Events.ServerEdits.Count-1 do
+        Events.ServerEdits[i](Self, Data);
     finally
       sl.Free;
     end;
@@ -127,8 +127,8 @@
 
       end;
       // Send to every registered event
-      for i:=0 to Events.Texts.Count-1 do
-        Events.Texts[i](Self, Data);
+      for i:=0 to Events.ClientMoves.Count-1 do
+        Events.ClientMoves[i](Self, Data);
     finally
       sl.Free;
     end;
@@ -150,8 +150,8 @@
 
       end;
       // Send to every registered event
-      for i:=0 to Events.Texts.Count-1 do
-        Events.Texts[i](Self, Data);
+      for i:=0 to Events.Disconnects.Count-1 do
+        Events.Disconnects[i](Self, Data);
     finally
       sl.Free;
     end;
@@ -173,8 +173,8 @@
 
       end;
       // Send to every registered event
-      for i:=0 to Events.Texts.Count-1 do
-        Events.Texts[i](Self, Data);
+      for i:=0 to Events.Connects.Count-1 do
+        Events.Connects[i](Self, Data);
     finally
       sl.Free;
     end;
@@ -196,8 +196,8 @@
 
       end;
       // Send to every registered event
-      for i:=0 to Events.Texts.Count-1 do
-        Events.Texts[i](Self, Data);
+      for i:=0 to Events.ChannelEdits.Count-1 do
+        Events.ChannelEdits[i](Self, Data);
     finally
       sl.Free;
     end;
@@ -215,10 +215,10 @@
       sl.Delimiter:=' ';
       sl.StrictDelimiter:=True;
       sl.DelimitedText:=n.Data;
-      Data:=CheckNSet(sl.Values['cid']);
+      CheckNSet(sl.Values['cid'], Data);
       // Send to every registered event
-      for i:=0 to Events.Texts.Count-1 do
-        Events.Texts[i](Self, Data);
+      for i:=0 to Events.DescriptionChanges.Count-1 do
+        Events.DescriptionChanges[i](Self, Data);
     finally
       sl.Free;
     end;

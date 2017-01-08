@@ -30,9 +30,6 @@ type
     property Config: TConfig read FConfig;
   end;
 
-const
-  SConfPath = './.tbconf';
-
 implementation
 
 { TTBCore }

@@ -10,7 +10,7 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils, TsBot.core, TsLib.NotificationManager, TsLib.Types, unit1
+  Classes, sysutils, TsBot.core, TsLib.NotificationManager, TsLib.Types
   { you can add units after this };
 
 var Bot: TTBCore;

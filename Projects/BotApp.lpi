@@ -46,6 +46,7 @@
               <OverflowChecks Value="True"/>
               <StackChecks Value="True"/>
             </Checks>
+            <VerifyObjMethodCallValidity Value="True"/>
           </CodeGeneration>
           <Linking>
             <Debugging>
@@ -147,7 +148,6 @@
       <Unit8>
         <Filename Value="..\TsLib\include\SendNotifications.inc"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="Unit1"/>
       </Unit8>
     </Units>
   </ProjectOptions>

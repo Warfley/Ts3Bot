@@ -17,69 +17,69 @@ uses
 
 implementation
 
-var LogFile: TextFile;
+var LogFile: THandle;
   DbgLog: Boolean;
   FileOpend: Boolean = False;
 
-{ TLogger }
+procedure WriteLogLn(Line: String);
+begin
+  if not FileOpend then exit;
+  line+=#10;
+  FileWrite(LogFile, Line[1], Length(Line));
+end;
 
 procedure CreateFileLogger(Path: String);
 begin
   if FileOpend then Exit;
   DbgLog:=False;
-  AssignFile(LogFile, Path);
   if FileExists(Path) then
-    Append(LogFile)
+    LogFile:=FileOpen(Path, fmAppend)
   else
-    Rewrite(LogFile);
-  WriteLn(LogFile, '--------------Start of Service--------------');
+    LogFile:=FileCreate(Path);
   FileOpend:=True;
+  WriteLogLn( '--------------Start of Service--------------');
 end;
 
 procedure CreateDebugLogger;
 begin
   if FileOpend then Exit;
   DbgLog:=True;
-  LogFile:=StdOut;
-  WriteLn(LogFile, '--------------Start of Service--------------');
+  LogFile:=StdOutputHandle;
   FileOpend:=True;
+  WriteLogLn( '--------------Start of Service--------------');
 end;
 
 procedure DestroyLogger;
 begin
   if not FileOpend then Exit;
-  WriteLn(LogFile, '-----------------End of Log-----------------');
+  WriteLogLn( '-----------------End of Log-----------------');
   if not DbgLog then
-    CloseFile(LogFile);
+    FileClose(LogFile);
   FileOpend:=False;
 end;
 
 procedure WriteError(ErrNo: integer; Err: string);
 begin
   if not FileOpend then Exit;
-  WriteLn(LogFile, Format('[Error No%d][%s]%s', [ErrNo, DateTimeToStr(Now), Err]));
-  Flush(LogFile);
+  WriteLogLn( Format('[Error No%d][%s]%s', [ErrNo, DateTimeToStr(Now), Err]));
 end;
 
 procedure WriteHint(Hint: string);
 begin
   if not FileOpend then Exit;
-  WriteLn(LogFile, Format('[Hint][%s]%s', [DateTimeToStr(Now), Hint]));
-  Flush(LogFile);
+  WriteLogLn( Format('[Hint][%s]%s', [DateTimeToStr(Now), Hint]));
 end;
 
 procedure WriteWarning(Warning: string);
 begin
   if not FileOpend then Exit;
-  WriteLn(LogFile, Format('[Warning][%s]%s', [DateTimeToStr(Now), Warning]));
-  Flush(LogFile);
+  WriteLogLn( Format('[Warning][%s]%s', [DateTimeToStr(Now), Warning]));
 end;
 
 procedure WriteStatus(Status: string);
 begin
   if not FileOpend then Exit;
-  WriteLn(LogFile, Format('[%s]%s', [DateTimeToStr(Now), Status]));
-  Flush(LogFile);
+  WriteLogLn( Format('[%s]%s', [DateTimeToStr(Now), Status]));
 end;
 
 end.
