@@ -5,7 +5,7 @@ unit TsLib.NotificationManager;
 interface
 
 uses
-  Classes, SysUtils, TsLib.Connection, TsLib.Types, Logger, strutils;
+  Classes, SysUtils, TsLib.Connection, TsLib.Types, Logger;
 
 type
 
@@ -56,6 +56,8 @@ type
   end;
 
 implementation
+
+uses strutils, TsLib.ValueRead;
 
 { TNotificationManager }
 

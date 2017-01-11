@@ -1,65 +1,3 @@
-  procedure CheckNSet(Val: String; out Result: Integer);
-  begin
-    if not TryStrToInt(Val, Result) then Result:=0;
-  end;
-
-  function CheckNSet(Val: String): Boolean;
-  begin
-    Result:=Val='1';
-  end;
-
-  procedure CheckNSet(Val: String; out Result: String);
-  var
-    pos, i, len: Integer;
-  begin
-    len:=Length(Val);
-    SetLength(Result, len);
-    i:=1;
-    pos:=1;
-    while i<=len do
-    begin
-      if Val[i] = '\' then
-      begin
-        case Val[i+1] of
-        's':
-        begin
-          Result[pos]:=' ';
-          inc(pos);
-        end;
-        't':
-        begin
-          Result[pos]:=#9;
-          inc(pos);
-        end;
-        '\':
-        begin
-          Result[pos]:='\';
-          inc(pos);
-        end;
-        'n':
-        begin
-          Result[pos]:=#10;
-          inc(pos);
-        end;
-        end;
-        inc(i);
-      end
-      else
-      begin
-        Result[pos]:=Val[i];
-        inc(pos);
-      end;
-      inc(i);
-    end;
-    SetLength(Result, pos);
-  end;
-
-  procedure CheckNSet(Val: String; out Result: TFlagAvatar);
-  begin
-    Result:='';
-    if Length(Val)=32 then Result:=Val;
-  end;
-
   procedure SendTM(n: TNotificationData);
   var
     Data: TTextNotification;
@@ -73,12 +11,12 @@
       sl.DelimitedText:=n.Data;
       with Data do
       begin
-        CheckNSet(sl.Values['targetmode'], TargetMode);
-        CheckNSet(sl.Values['msg'], Message);
-        CheckNSet(sl.Values['target'], Target);
-        CheckNSet(sl.Values['invokerid'], SenderID);
-        CheckNSet(sl.Values['invokername'], SenderName);
-        CheckNSet(sl.Values['invokeruid'], SenderUID);
+        ReadValue(sl.Values['targetmode'], TargetMode);
+        ReadValue(sl.Values['msg'], Message);
+        ReadValue(sl.Values['target'], Target);
+        ReadValue(sl.Values['invokerid'], SenderID);
+        ReadValue(sl.Values['invokername'], SenderName);
+        ReadValue(sl.Values['invokeruid'], SenderUID);
       end;
       // Send to every registered event
       for i:=0 to Events.Texts.Count-1 do
@@ -101,7 +39,19 @@
       sl.DelimitedText:=n.Data;
       with Data do
       begin
-        { TODO : TODO }
+        ReadValue(SL.Values['reasonid'], ReasonID);
+        ReadValue(SL.Values['invokerid'], InvokerID);
+        ReadValue(SL.Values['invokername'], InvokerName);
+        ReadValue(SL.Values['invokeruid'], InvokerUID);
+        SetLength(Changes, sl.Count-4);
+        for i:=4 to sl.Count-1 do
+          if sl.Names[i]='' then
+            Changes[i-4][0]:=sl[i]
+          else
+          begin
+            Changes[i-4][0]:=sl.Names[i];
+            Changes[i-4][1]:=sl.ValueFromIndex[i];
+          end;
       end;
       // Send to every registered event
       for i:=0 to Events.ServerEdits.Count-1 do
@@ -215,7 +165,7 @@
       sl.Delimiter:=' ';
       sl.StrictDelimiter:=True;
       sl.DelimitedText:=n.Data;
-      CheckNSet(sl.Values['cid'], Data);
+      ReadValue(sl.Values['cid'], Data);
       // Send to every registered event
       for i:=0 to Events.DescriptionChanges.Count-1 do
         Events.DescriptionChanges[i](Self, Data);

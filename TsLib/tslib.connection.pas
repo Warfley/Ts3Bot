@@ -266,10 +266,12 @@ begin
   try
     // Close Connection
     SendCommand('quit');
-    TelnetConnection.Disconnect(True);
+    sleep(100);
+    TelnetConnection.CheckForGracefulDisconnect;
   except
     // Ignore connection closed by other side
-    on e: EIdConnClosedGracefully do ;
+    on e: EIdConnClosedGracefully do
+      WriteStatus('Disconnected');
   end;
 end;
 

@@ -27,7 +27,7 @@
           <Version Value="11"/>
           <PathDelim Value="\"/>
           <Target>
-            <Filename Value="../bin/$(TargetCPU)-$(TargetOS)/Debug/Ts3Bot"/>
+            <Filename Value="..\bin\$(TargetCPU)-$(TargetOS)\Debug\Ts3Bot"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
@@ -56,10 +56,8 @@
             </Debugging>
           </Linking>
           <Other>
-            <CustomOptions Value="-dDebug"/>
-            <OtherDefines Count="1">
-              <Define0 Value="Debug"/>
-            </OtherDefines>
+            <CustomOptions Value="-dDebug
+-dUSE_SEMICOLON_BEFORE_DEPRECATED"/>
           </Other>
         </CompilerOptions>
       </Item2>
@@ -68,7 +66,7 @@
           <Version Value="11"/>
           <PathDelim Value="\"/>
           <Target>
-            <Filename Value="../bin/$(TargetCPU)-$(TargetOS)/Release/Ts3Bot"/>
+            <Filename Value="..\bin\$(TargetCPU)-$(TargetOS)\Release\Ts3Bot"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>

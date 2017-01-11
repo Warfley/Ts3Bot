@@ -82,13 +82,10 @@ begin
     // While the thread is active
     while not Terminated do
     begin
-      try
       // Setup Bot
-      if not SetUp then
+      if SetUp then
       begin
-        //Something went wrong
-        Continue;
-      end;
+      try
         try
           // Start run
           Run;
@@ -98,6 +95,11 @@ begin
       finally
         // Deinitialize Bot
         CleanUp;
+      end;
+      end
+      else
+      begin
+        // SOmething went wrong
       end;
       {$IfDef DEBUG}
       Terminate;

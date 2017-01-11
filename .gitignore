@@ -26,6 +26,9 @@ backup/
 *.bak
 lib/
 
+# Exec path
+bin/
+
 # Application bundle for Mac OS
 *.app/
 
