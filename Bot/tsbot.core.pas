@@ -47,7 +47,7 @@ function TTBCore.SetUp: Boolean;
 begin
   FConnection := TTsConnection.Create(FConfig.IPAddress, FConfig.Port);
   with FConnection do
-    Result:= not (Connect()
+    Result:= (Connect()
              and LogIn(FConfig.Username, FConfig.Password)
              and SwitchServer(FConfig.ServerID)
              );
@@ -82,14 +82,13 @@ begin
     // While the thread is active
     while not Terminated do
     begin
+      try
       // Setup Bot
       if not SetUp then
       begin
         //Something went wrong
-        SleepAndCheck(2000);
         Continue;
       end;
-      try
         try
           // Start run
           Run;
