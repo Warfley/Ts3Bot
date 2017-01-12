@@ -5,7 +5,8 @@ unit TsBot.core;
 interface
 
 uses
-  Classes, SysUtils, TsBot.Config, Logger, TsLib.Connection;
+  Classes, SysUtils, TsBot.Config, Logger, TsLib.Types, TsLib.Connection,
+  TsLib.NotificationManager;
 
 type
 
@@ -16,11 +17,11 @@ type
     FConfigPath: string;
     FConfig: TConfig;
     FConnection: TTsConnection;
-    procedure SleepAndCheck(Time: Integer; Step: Integer = 100);
+    procedure SleepAndCheck(Time: integer; Step: integer = 100);
     { Private declarations }
   protected
     { Protected declarations }
-    function SetUp: Boolean;
+    function SetUp: boolean;
     procedure CleanUp;
     procedure Run;
     procedure Execute; override;
@@ -34,23 +35,23 @@ implementation
 
 { TTBCore }
 
-procedure TTBCore.SleepAndCheck(Time: Integer; Step: Integer);
+procedure TTBCore.SleepAndCheck(Time: integer; Step: integer);
 begin
-  while (Time>0) and not Terminated do
+  while (Time > 0) and not Terminated do
   begin
     Sleep(Step);
+    CheckSynchronize();
     Dec(Time, Step);
   end;
 end;
 
-function TTBCore.SetUp: Boolean;
+function TTBCore.SetUp: boolean;
 begin
   FConnection := TTsConnection.Create(FConfig.IPAddress, FConfig.Port);
-  with FConnection do
-    Result := (Connect()
-              and LogIn(FConfig.Username, FConfig.Password)
-              and SwitchServer(FConfig.ServerID)
-              );
+    with FConnection do
+      Result := (Connect()
+                and LogIn(FConfig.Username, FConfig.Password)
+                and SwitchServer(FConfig.ServerID));
 end;
 
 procedure TTBCore.CleanUp;
@@ -65,7 +66,9 @@ end;
 
 procedure TTBCore.Run;
 begin
-
+  while not Terminated do
+    Sleep(100);
+  { TODO : Implement Something here }
 end;
 
 procedure TTBCore.Execute;
@@ -83,23 +86,23 @@ begin
     while not Terminated do
     begin
       // Setup Bot
-      if SetUp then
-      begin
       try
-        try
-          // Start run
-          Run;
-        Except
-          { TODO : Errorhandling }
+        if SetUp then
+        begin
+          try
+            // Start run
+            Run;
+          except
+            { TODO : Errorhandling }
+          end;
+        end
+        else
+        begin
+          // SOmething went wrong
         end;
       finally
         // Deinitialize Bot
         CleanUp;
-      end;
-      end
-      else
-      begin
-        // SOmething went wrong
       end;
       {$IfDef DEBUG}
       Terminate;

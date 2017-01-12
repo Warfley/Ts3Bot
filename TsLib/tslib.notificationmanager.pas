@@ -21,6 +21,7 @@ type
     QueuedNotifications: TThreadList;
     FActive: boolean;
     ListeningChannels: TIntegerList;
+    function GetNotificationsAvailable: Boolean;
     procedure SetActive(AValue: boolean);
     procedure AddListeningChannel(ChannelID: integer);
   protected
@@ -53,6 +54,7 @@ type
       read FAutoSendNotifications write FAutoSendNotifications;
     property ThreadedNotifications: boolean
       read FThreadedNotifications write FThreadedNotifications;
+    property NotificationsAvailable: Boolean read GetNotificationsAvailable;
   end;
 
 implementation
@@ -69,6 +71,15 @@ begin
     Start
   else
     Stop;
+end;
+
+function TNotificationManager.GetNotificationsAvailable: Boolean;
+begin
+  try
+    Result:=QueuedNotifications.LockList.Count>0;
+  finally
+    QueuedNotifications.UnlockList;
+  end;
 end;
 
 procedure TNotificationManager.AddListeningChannel(ChannelID: integer);
@@ -103,7 +114,7 @@ begin
   try
     for i:=0 to lst.Count-1 do
       with PNotificationData(lst[i])^ do
-        if (NType = n^.NType) and Data = n^.Data then
+        if (NType = n^.NType) and (Data = n^.Data) then
         begin
           Dispose(n);
           Exit;

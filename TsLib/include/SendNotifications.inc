@@ -205,7 +205,7 @@
         Reason:=ReadReasonData(SL);
         Invoker:=ReadInvokerData(sl);
         SetLength(Changes, sl.Count-5);
-        for i:=4 to sl.Count-1 do
+        for i:=5 to sl.Count-1 do
           if sl.Names[i]='' then
             Changes[i-5][0]:=sl[i]
           else
@@ -220,6 +220,7 @@
     finally
       sl.Free;
     end;
+    QueuedNotifications.Clear;
   end;
 
   procedure SendDC(n: TNotificationData);

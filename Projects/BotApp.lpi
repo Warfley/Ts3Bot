@@ -31,7 +31,7 @@
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
-            <OtherUnitFiles Value="..\Bot;..\Common;..\TsLib"/>
+            <OtherUnitFiles Value="..\Bot;..\Common;..\TsLib;..\UI"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
           <Parsing>
@@ -104,7 +104,7 @@
         <PackageName Value="indylaz"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="10">
+    <Units Count="12">
       <Unit0>
         <Filename Value="BotApp.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -152,6 +152,16 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="TsLib.ValueRead"/>
       </Unit9>
+      <Unit10>
+        <Filename Value="..\UI\tsbotui.cli.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsBotUI.CLI"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="..\UI\tsbotui.types.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsBotUI.Types"/>
+      </Unit11>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

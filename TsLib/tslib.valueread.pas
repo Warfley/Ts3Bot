@@ -108,7 +108,7 @@ var
 begin
   Result:=Length(Str)>0;
   for c in str do
-    if not c in ['0'..'9'] then
+    if not (c in ['0'..'9']) then
     begin
       Result:=False;
       Break;

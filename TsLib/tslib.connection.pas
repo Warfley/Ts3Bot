@@ -76,6 +76,7 @@ uses strutils;
 
 function TTsConnection.getConnected: boolean;
 begin
+  TelnetConnection.CheckForGracefulDisconnect(False);
   Result := TelnetConnection.Connected;
 end;
 
@@ -318,6 +319,7 @@ begin
   FWaitingForStatus := True;
   // Add Reciever to get result
   AddReciever(@RecieveStatus);
+  try
   // Send command
   SendCommand(Cmd);
 
@@ -340,7 +342,13 @@ begin
 
   if FLastError.ErrNo <> 0 then
     WriteError(FLastError.ErrNo, FLastError.Msg);
-
+  except
+    on e:EIdConnClosedGracefully do
+    begin
+      FLastError.ErrNo:=1;
+      FLastError.Msg:='Connection closed by server';
+    end;
+  end;
   // Return result
   Result := FLastError;
 end;

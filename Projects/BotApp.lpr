@@ -2,16 +2,13 @@ program BotApp;
 
 {$mode objfpc}{$H+}
 {$Define UseCThreads}
-{$IfNDef DEBUG}
-{$AppType GUI}
-{$EndIf}
 
 uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
-  Classes, sysutils, TsBot.core, TsLib.NotificationManager, TsLib.Types
-  { you can add units after this };
+  Classes, sysutils, TsBot.core, TsLib.NotificationManager, TsLib.Types,
+TsBotUI.CLI, TsBotUI.Types;
 
 var Bot: TTBCore;
 
@@ -20,8 +17,15 @@ begin
   Bot:=nil;
 end;
 
+procedure CommandEntered(CommandType: TCommandType; Data: PtrInt);
+begin
+  if CommandType=ctQuit then
+      Bot.Terminate;
+end;
+
 var
   m: TMethod;
+  cli: TCommandLineInterface;
 
 begin
   {$IfDef DEBUG}
@@ -29,15 +33,22 @@ begin
     DeleteFile('heap.trc');
   SetHeapTraceOutput('heap.trc');
   {$EndIf}
+
+  // Command line event
+  m.Code:=@CommandEntered;
+  m.Data:=Nil;
+  // Create command line interface
+  cli:=TCommandLineInterface.Create(TCommandEvent(m));
+  // Thread stopped event
   m.Code:=@ThreadStopped;
   m.Data:=Nil;
+  // Create Bot
   Bot:=TTBCore.Create(TNotifyEvent(m), './config');
-  while Assigned(Bot) and not Bot.Finished do
-  begin
-    Sleep(200);
-    CheckSynchronize();
-  end;
-  if Assigned(Bot) and Bot.Finished then FreeAndNil(Bot);
+  // Run Bot
+  bot.WaitFor;
+  cli.Terminate;
+  {$If defined(DEBUG) AND defined(Windows)}
   ReadLn;
+  {$EndIf}
 end.
 
