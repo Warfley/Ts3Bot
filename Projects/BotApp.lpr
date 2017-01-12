@@ -34,11 +34,8 @@ begin
   SetHeapTraceOutput('heap.trc');
   {$EndIf}
 
-  // Command line event
-  m.Code:=@CommandEntered;
-  m.Data:=Nil;
   // Create command line interface
-  cli:=TCommandLineInterface.Create(TCommandEvent(m));
+  cli:=TCommandLineInterface.Create(@CommandEntered);
   // Thread stopped event
   m.Code:=@ThreadStopped;
   m.Data:=Nil;
@@ -47,6 +44,7 @@ begin
   // Run Bot
   bot.WaitFor;
   cli.Terminate;
+  cli.WaitFor;
   {$If defined(DEBUG) AND defined(Windows)}
   ReadLn;
   {$EndIf}

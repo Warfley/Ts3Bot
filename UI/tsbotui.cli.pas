@@ -21,6 +21,7 @@ type
   private
     { Private declarations }
     FEventToFire: TCommandEventData;
+    FOnCommandMethod: TCommandEventMethod;
     FOnCommand: TCommandEvent;
     procedure FireEvent;
     function ReadDaShit(out str: String): Boolean;
@@ -28,9 +29,11 @@ type
     { Protected declarations }
     procedure Execute; override;
   public
+    constructor Create(AOnCommand: TCommandEventMethod);
     constructor Create(AOnCommand: TCommandEvent);
     destructor Destroy; override;
     property OnCommand: TCommandEvent read FOnCommand write FOnCommand;
+    property OnCommandMethod: TCommandEventMethod read FOnCommandMethod write FOnCommandMethod;
   end;
 
 implementation
@@ -103,7 +106,7 @@ begin
       begin
         Result := irInputRecord.Event.KeyEvent.AsciiChar;
         if irInputRecord.Event.KeyEvent.wVirtualKeyCode in [VK_LEFT, VK_RIGHT] then
-          Result:=Char(irInputRecord.Event.KeyEvent.wVirtualKeyCode);
+          Result:=Char(irInputRecord.Event.KeyEvent.wVirtualKeyCode-33);
         ReadConsoleInputA(hStdin, irInputRecord, 1, dwEventsRead);
         Exit;
       end
@@ -127,6 +130,8 @@ procedure TCommandLineInterface.FireEvent;
 begin
   if Assigned(FOnCommand) then
     FOnCommand(FEventToFire.CommandType, FEventToFire.Data);
+  if Assigned(FOnCommandMethod) then
+    FOnCommandMethod(FEventToFire.CommandType, FEventToFire.Data);
 end;
 
 function TCommandLineInterface.ReadDaShit(out str: String): Boolean;
@@ -137,12 +142,15 @@ begin
   str:='';
   c:=#0;
   currPos:=1;
-  Write('cmd> ');
   while (c<>#13) and not Terminated do
   begin
     c:=ReadChar(False);
     case c of
+    {$IFDEF Windows}
+    #9, #33..#45, #47..#255:
+    {$Else}
     #9, #48..#255:
+    {$EndIf}
     begin
       str:=Copy(str, 1, currPos-1)+c+Copy(str,currPos, Length(str));
       inc(currPos);
@@ -163,8 +171,18 @@ begin
       c:=#0;
       currPos:=1;
     end;
-    #37: currPos:=max(currPos-1, 1);
-    #39: inc(currPos);
+    {$IFDEF Windows}
+    #4:
+    {$Else}
+    #37:
+    {$EndIf}
+      currPos:=max(currPos-1, 1);
+    {$IFDEF Windows}
+    #6:
+    {$Else}
+    #39:
+    {$EndIf}
+      inc(currPos);
     end;
     if c<>#0 then
     begin
@@ -186,11 +204,30 @@ var s: String;
 begin
   while ReadDaShit(s) do
   begin
+    s:=LowerCase(s);
     with FEventToFire do
-    if LowerCase(s)='quit' then
+    if s='quit' then
     begin
       CommandType:=ctQuit;
       Data:=0;
+    end
+    else if s='configconnection' then
+    begin
+      CommandType:=ctSetConnectionData;
+      new(PConnectionData(Data));
+      with PConnectionData(Data)^ do
+      begin
+        Write('IP:');
+        ReadLn(IP);
+        Write('Port:');
+        ReadLn(Port);
+        Write('ServerID:');
+        ReadLn(ServerID);
+        Write('Username:');
+        ReadLn(UserName);
+        Write('Password:');
+        ReadLn(Password);
+      end;
     end
     else
     begin
@@ -198,7 +235,17 @@ begin
       Continue;
     end;
     Synchronize(@FireEvent);
+    case FEventToFire.CommandType of
+    ctSetConnectionData: Dispose(PConnectionData(FEventToFire.Data));
+    end;
   end;
+end;
+
+constructor TCommandLineInterface.Create(AOnCommand: TCommandEventMethod);
+begin
+  FOnCommandMethod:=AOnCommand;
+  FreeOnTerminate:=True;
+  inherited Create(False);
 end;
 
 constructor TCommandLineInterface.Create(AOnCommand: TCommandEvent);

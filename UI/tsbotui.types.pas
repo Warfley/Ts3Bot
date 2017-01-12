@@ -20,7 +20,8 @@ type
   end;
 
 
-  TCommandEvent = procedure(CommandType: TCommandType; Data: PtrInt) of object;
+  TCommandEventMethod = procedure(CommandType: TCommandType; Data: PtrInt) of object;
+  TCommandEvent = procedure(CommandType: TCommandType; Data: PtrInt);
 
   TCommandEventData = record
     CommandType: TCommandType;
