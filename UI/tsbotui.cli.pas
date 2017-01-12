@@ -24,7 +24,9 @@ type
     FOnCommandMethod: TCommandEventMethod;
     FOnCommand: TCommandEvent;
     procedure FireEvent;
-    function ReadDaShit(out str: String): Boolean;
+    function ReadDaShit(out str: string): boolean;
+    procedure PrintHelp;
+    procedure CommandExecuted(Sender: TObject; Command: TCommandType; Status: boolean);
   protected
     { Protected declarations }
     procedure Execute; override;
@@ -33,12 +35,13 @@ type
     constructor Create(AOnCommand: TCommandEvent);
     destructor Destroy; override;
     property OnCommand: TCommandEvent read FOnCommand write FOnCommand;
-    property OnCommandMethod: TCommandEventMethod read FOnCommandMethod write FOnCommandMethod;
+    property OnCommandMethod: TCommandEventMethod
+      read FOnCommandMethod write FOnCommandMethod;
   end;
 
 implementation
 
-uses math;
+uses Math;
 
 {$IfDef UNIX}
 
@@ -106,7 +109,9 @@ begin
       begin
         Result := irInputRecord.Event.KeyEvent.AsciiChar;
         if irInputRecord.Event.KeyEvent.wVirtualKeyCode in [VK_LEFT, VK_RIGHT] then
-          Result:=Char(irInputRecord.Event.KeyEvent.wVirtualKeyCode-33);
+          Result := char(irInputRecord.Event.KeyEvent.wVirtualKeyCode - 33)
+        else if irInputRecord.Event.KeyEvent.wVirtualKeyCode = VK_DELETE then
+          Result := #1;
         ReadConsoleInputA(hStdin, irInputRecord, 1, dwEventsRead);
         Exit;
       end
@@ -117,7 +122,7 @@ end;
 
 {$EndIf}
 
-procedure GotoX(X: Integer);
+procedure GotoX(X: integer);
 begin
   {$IfDef WINDOWS}
   GotoXY(X, WhereY);
@@ -129,129 +134,203 @@ end;
 procedure TCommandLineInterface.FireEvent;
 begin
   if Assigned(FOnCommand) then
-    FOnCommand(FEventToFire.CommandType, FEventToFire.Data);
+    FOnCommand(FEventToFire);
   if Assigned(FOnCommandMethod) then
-    FOnCommandMethod(FEventToFire.CommandType, FEventToFire.Data);
+    FOnCommandMethod(FEventToFire);
 end;
 
-function TCommandLineInterface.ReadDaShit(out str: String): Boolean;
+function TCommandLineInterface.ReadDaShit(out str: string): boolean;
 var
-  c: Char;
-  currPos: Integer;
+  c: char;
+  currPos: integer;
 begin
-  str:='';
-  c:=#0;
-  currPos:=1;
-  while (c<>#13) and not Terminated do
+  str := '';
+  c := #0;
+  currPos := 1;
+  while (c <> #13) and not Terminated do
   begin
-    c:=ReadChar(False);
+    c := ReadChar(False);
     case c of
     {$IFDEF Windows}
-    #9, #33..#45, #47..#255:
+    #9, #32..#45, #47..#255:
     {$Else}
-    #9, #48..#255:
+      #9, #32, #48..#255:
     {$EndIf}
-    begin
-      str:=Copy(str, 1, currPos-1)+c+Copy(str,currPos, Length(str));
-      inc(currPos);
-    end;
-    #8:
-    begin
-      if currPos>1 then
       begin
-        Dec(currPos);
-        Delete(str, currPos, 1);
+        str := Copy(str, 1, currPos - 1) + c + Copy(str, currPos, Length(str));
+        Inc(currPos);
       end;
-    end;
-    #46:
-      Delete(str, currPos, 1);
-    #27:
-    begin
-      str:='';
-      c:=#0;
-      currPos:=1;
-    end;
+      #8:
+      begin
+        if currPos > 1 then
+        begin
+          Dec(currPos);
+          Delete(str, currPos, 1);
+        end;
+      end;
+    {$IFDEF Windows}
+    #1:
+    {$Else}
+      #37:
+    {$EndIf}
+        Delete(str, currPos, 1);
+      #27:
+      begin
+        str := '';
+        c := #0;
+        currPos := 1;
+      end;
     {$IFDEF Windows}
     #4:
     {$Else}
-    #37:
+      #37:
     {$EndIf}
-      currPos:=max(currPos-1, 1);
+        currPos := max(currPos - 1, 1);
     {$IFDEF Windows}
     #6:
     {$Else}
-    #39:
+      #39:
     {$EndIf}
-      inc(currPos);
+        currPos := min(currPos + 1, Length(str) + 1);
     end;
-    if c<>#0 then
+    if c in [
+{$IFDEF Windows} #4, #6 {$Else}
+      #37, #39
+{$EndIf}
+      ] then
+    begin
+      GotoX(currPos + 5);
+    end
+    else if c <> #0 then
     begin
       {$IfDef WINDOWS}
-      Write(#13);
-      ClrEol;
+      if c in [#9, #32..#45, #47..#255] then
+        Write(#13, 'CLI> ',str)
+      else
+      begin
+        Write(#13);
+        ClrEol;
+        Write('CLI> ', str);
+      end;
+      {$Else}
+      Write(#13, 'CLI> ', str);
       {$EndIf}
-      Write({$IfDef UNIX}#13, {$EndIf}'cmd> ',str);
-      GotoX(currPos+5);
-      Sleep(10);
+      GotoX(currPos + 5);
     end;
+    Sleep(10);
   end;
   WriteLn('');
-  Result:=not Terminated;
+  Result := not Terminated;
+end;
+
+procedure TCommandLineInterface.PrintHelp;
+begin
+  WriteLn('-----------------------Commandlineinterface help-----------------------');
+  WriteLn('|       Command      |                 Description                    |');
+  WriteLn('|---------------------------------------------------------------------|');
+  WriteLn('|quit                | Stops the bot                                  |');
+  WriteLn('|restart             | Restarts the bot                               |');
+  WriteLn('|configconnection    | Change the connection data and restarts the Bot|');
+  WriteLn('|switchserver        | Switches to another virtual server             |');
+  WriteLn('|help                | Shows this text                                |');
+  WriteLn('-----------------------------------------------------------------------');
+end;
+
+procedure TCommandLineInterface.CommandExecuted(Sender: TObject;
+  Command: TCommandType; Status: boolean);
+begin
+  case Command of
+    ctRestart:
+      if Status then
+        WriteLn('CLI> Restart successful')
+      else
+        WriteLn('CLI> Couln''t perform restart');
+    ctQuit:
+      if Status then
+        WriteLn('CLI> Shutting down')
+      else
+        WriteLn('CLI> Error on shutting down');
+    ctSwitchServer:
+      if Status then
+        WriteLn('CLI> Server switched')
+      else
+        WriteLn('CLI> Error on switching server');
+    ctSetConnectionData:
+      if Status then
+        WriteLn('CLI> Connection data successful set')
+      else
+        WriteLn('CLI> Couldn''t change connection data');
+  end;
 end;
 
 procedure TCommandLineInterface.Execute;
-var s: String;
+var
+  s: string;
 begin
   while ReadDaShit(s) do
   begin
-    s:=LowerCase(s);
+    s := LowerCase(s);
     with FEventToFire do
-    if s='quit' then
-    begin
-      CommandType:=ctQuit;
-      Data:=0;
-    end
-    else if s='configconnection' then
-    begin
-      CommandType:=ctSetConnectionData;
-      new(PConnectionData(Data));
-      with PConnectionData(Data)^ do
+      if s = 'quit' then
       begin
-        Write('IP:');
-        ReadLn(IP);
-        Write('Port:');
-        ReadLn(Port);
-        Write('ServerID:');
-        ReadLn(ServerID);
-        Write('Username:');
-        ReadLn(UserName);
-        Write('Password:');
-        ReadLn(Password);
+        CommandType := ctQuit;
+        Data := 0;
+      end
+      else if s = 'restart' then
+      begin
+        CommandType := ctRestart;
+        Data := 0;
+      end
+      else if s = 'switchserver' then
+      begin
+        CommandType := ctSwitchServer;
+        Write('ServerID: ');
+        ReadLn(Data);
+      end
+      else if s = 'configconnection' then
+      begin
+        CommandType := ctSetConnectionData;
+        new(PConnectionData(Data));
+        with PConnectionData(Data)^ do
+        begin
+          Write('IP:       ');
+          ReadLn(IP);
+          Write('Port:     ');
+          ReadLn(Port);
+          Write('ServerID: ');
+          ReadLn(ServerID);
+          Write('Username: ');
+          ReadLn(UserName);
+          Write('Password: ');
+          ReadLn(Password);
+        end;
+      end
+      else if s = 'help' then
+      begin
+        PrintHelp;
+        Continue;
+      end
+      else
+      begin
+        WriteLn('Unknown command');
+        Continue;
       end;
-    end
-    else
-    begin
-      WriteLn('Unknown command');
-      Continue;
-    end;
+    FEventToFire.OnFinished := @CommandExecuted;
     Synchronize(@FireEvent);
-    case FEventToFire.CommandType of
-    ctSetConnectionData: Dispose(PConnectionData(FEventToFire.Data));
-    end;
   end;
 end;
 
 constructor TCommandLineInterface.Create(AOnCommand: TCommandEventMethod);
 begin
-  FOnCommandMethod:=AOnCommand;
-  FreeOnTerminate:=True;
+  FOnCommandMethod := AOnCommand;
+  FreeOnTerminate := True;
   inherited Create(False);
 end;
 
 constructor TCommandLineInterface.Create(AOnCommand: TCommandEvent);
 begin
-  FOnCommand:=AOnCommand;
-  FreeOnTerminate:=True;
+  FOnCommand := AOnCommand;
+  FreeOnTerminate := True;
   inherited Create(False);
 end;
 
@@ -261,4 +340,3 @@ begin
 end;
 
 end.
-

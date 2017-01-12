@@ -76,6 +76,11 @@ uses strutils;
 
 function TTsConnection.getConnected: boolean;
 begin
+  if not Assigned(TelnetConnection) then
+  begin
+    Result:=False;
+    Exit;
+  end;
   TelnetConnection.CheckForGracefulDisconnect(False);
   Result := TelnetConnection.Connected;
 end;
@@ -124,9 +129,7 @@ begin
   begin
     FServerID := NewSID;
     WriteStatus(Format('Switched to server %d', [NewSID]));
-  end
-  else
-    WriteError(res.ErrNo, res.Msg);
+  end;
 end;
 
 function TTsConnection.RecieveStatus(Sender: TObject; Data: string;
@@ -365,9 +368,7 @@ begin
   FLoggedIn := Result;
   // Write Log
   if Result then
-    WriteStatus('Login successful')
-  else
-    WriteStatus('Login failed ' + err.Msg);
+    WriteStatus('Login successful');
 end;
 
 procedure TTsConnection.LogOut;

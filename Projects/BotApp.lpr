@@ -8,7 +8,7 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Classes, sysutils, TsBot.core, TsLib.NotificationManager, TsLib.Types,
-TsBotUI.CLI, TsBotUI.Types;
+TsBotUI.CLI, TsBotUI.Types, Logger;
 
 var Bot: TTBCore;
 
@@ -17,10 +17,10 @@ begin
   Bot:=nil;
 end;
 
-procedure CommandEntered(CommandType: TCommandType; Data: PtrInt);
+procedure CommandEntered(Cmd: TCommandEventData);
 begin
-  if CommandType=ctQuit then
-      Bot.Terminate;
+  if Assigned(Bot) then
+    Bot.RegisterCommand(Cmd);
 end;
 
 var
@@ -33,6 +33,7 @@ begin
     DeleteFile('heap.trc');
   SetHeapTraceOutput('heap.trc');
   {$EndIf}
+  CreateDebugLogger;
 
   // Create command line interface
   cli:=TCommandLineInterface.Create(@CommandEntered);
@@ -40,11 +41,12 @@ begin
   m.Code:=@ThreadStopped;
   m.Data:=Nil;
   // Create Bot
-  Bot:=TTBCore.Create(TNotifyEvent(m), './config');
+  Bot:=TTBCore.Create(TNotifyEvent(m), './config', False);
   // Run Bot
   bot.WaitFor;
   cli.Terminate;
   cli.WaitFor;
+  DestroyDebugLogger;
   {$If defined(DEBUG) AND defined(Windows)}
   ReadLn;
   {$EndIf}

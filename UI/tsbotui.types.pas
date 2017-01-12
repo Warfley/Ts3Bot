@@ -8,27 +8,33 @@ uses
   Classes, SysUtils, gvector;
 
 type
-  TCommandType = (ctQuit, ctSetConnectionData);
+  TCommandType = (ctQuit, ctRestart, ctSetConnectionData, ctSwitchServer);
 
   PConnectionData = ^TConnectionData;
+
   TConnectionData = record
-    IP: String;
-    Port: Integer;
-    ServerID: Integer;
-    UserName: String;
-    Password: String;
+    IP: string;
+    Port: integer;
+    ServerID: integer;
+    UserName: string;
+    Password: string;
   end;
 
-
-  TCommandEventMethod = procedure(CommandType: TCommandType; Data: PtrInt) of object;
-  TCommandEvent = procedure(CommandType: TCommandType; Data: PtrInt);
+  TCommandFinishedEvent = procedure(Sender: TObject; Command: TCommandType;
+    Status: boolean) of object;
 
   TCommandEventData = record
     CommandType: TCommandType;
     Data: PtrInt;
+    OnFinished: TCommandFinishedEvent;
   end;
+
+  TCommandEventMethod = procedure(Cmd: TCommandEventData) of object;
+  TCommandEvent = procedure(Cmd: TCommandEventData);
+
+
+  TCommandList = specialize TVector<TCommandEventData>;
 
 implementation
 
 end.
-
