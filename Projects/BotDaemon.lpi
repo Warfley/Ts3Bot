@@ -29,7 +29,7 @@
             <Filename Value="../bin/$(TargetCPU)-$(TargetOS)/Debug/Ts3BotDaemon"/>
           </Target>
           <SearchPaths>
-            <IncludeFiles Value="$(ProjOutDir)"/>
+            <IncludeFiles Value="$(ProjOutDir);..\TsLib\include"/>
             <OtherUnitFiles Value="..\TsLib;..\Common;..\Daemon;..\Bot"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
@@ -69,7 +69,7 @@
             <Filename Value="../bin/$(TargetCPU)-$(TargetOS)/Release/Ts3BotDaemon"/>
           </Target>
           <SearchPaths>
-            <IncludeFiles Value="$(ProjOutDir)"/>
+            <IncludeFiles Value="$(ProjOutDir);..\TsLib\include"/>
             <OtherUnitFiles Value="..\TsLib;..\Bot;..\Daemon"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
@@ -111,7 +111,7 @@
         <PackageName Value="FCL"/>
       </Item4>
     </RequiredPackages>
-    <Units Count="9">
+    <Units Count="12">
       <Unit0>
         <Filename Value="BotDaemon.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -157,6 +157,18 @@
         <Filename Value="..\TsLib\tslib.notificationmanager.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit8>
+      <Unit9>
+        <Filename Value="..\TsLib\include\NotificationTypes.inc"/>
+        <IsPartOfProject Value="True"/>
+      </Unit9>
+      <Unit10>
+        <Filename Value="..\TsLib\include\SendNotifications.inc"/>
+        <IsPartOfProject Value="True"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="..\TsLib\tslib.valueread.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit11>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -166,7 +178,7 @@
       <Filename Value="BotDaemon"/>
     </Target>
     <SearchPaths>
-      <IncludeFiles Value="$(ProjOutDir)"/>
+      <IncludeFiles Value="$(ProjOutDir);..\TsLib\include"/>
       <OtherUnitFiles Value="..\TsLib;..\Bot;..\Daemon"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>

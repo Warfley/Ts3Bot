@@ -15,38 +15,49 @@
 
   { Parsed Notification Data }
 
+  TInvokerData = record
+    ID: Integer;
+    Name: String;
+    UID: String;
+  end;
+
+  TReasonData = record
+    ID: Integer;
+    Message: String;
+  end;
+
   TTextNotification = record
     TargetMode: integer;
     Message: string;
     Target: integer;
-    SenderID: integer;
-    SenderName: string;
-    SenderUID: string;
+    Invoker: TInvokerData;
   end;
 
   TServerEditNotification = record
-    ReasonID: integer;
-    InvokerID: integer;
-    InvokerName: string;
-    InvokerUID: integer;
+    Reason: TReasonData;
+    Invoker: TInvokerData;
     Changes: Array of Array[0..1] of String;
   end;
 
   TClientMoveNotification = record
     ChannelTargetID: integer;
-    ReasonID: integer;
+    Reason: TReasonData;
     ClientID: integer;
+    Invoker: TInvokerData;
   end;
 
   TClientDCNotification = record
     ChannelID: integer;
     ChannelTargetID: integer;
-    ResonID: integer;
+    Reason: TReasonData;
     ReasonMessage: string;
     ClientID: integer;
+    Invoker: TInvokerData
   end;
 
   TFlagAvatar =  String[32];
+
+  TDynIntArray = array of Integer;
 
   TNotificationClientData = record
     ID: Integer;
@@ -61,7 +72,7 @@
     Recording: Boolean;
     DatabaseID: Integer;
     ChannelGroup: Integer;
-    ServerGroups: array of Integer;
+    ServerGroups: TDynIntArray;
     IsAway: Boolean;
     AfkMessage: String;
     CType: Integer;
@@ -85,16 +96,14 @@
   TClientConnectNotification = record
     ChannelFromID: integer;
     ChannelTargetID: integer;
-    ReasonID: integer;
+    Reason: TReasonData;
     Client: TNotificationClientData;
   end;
 
   TChannelEditedNotification = record
     ChannelID: integer;
-    ResonID: integer;
-    ClientID: integer;
-    ClientName: string;
-    ClientUID: string;
+    Reason: TReasonData;
+    Invoker: TInvokerData;
     Changes: Array of Array[0..1] of String;
   end;
 

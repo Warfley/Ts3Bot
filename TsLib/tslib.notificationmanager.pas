@@ -86,6 +86,9 @@ function TNotificationManager.NotificationRecieved(Sender: TObject;
   Data: string; var RemoveFromList: boolean): boolean;
 var
   n: PNotificationData;
+  lst: TList;
+  found: Boolean;
+  i: Integer;
 begin
   RemoveFromList := False;
   Result := AnsiStartsStr('notify', Data);
@@ -95,6 +98,19 @@ begin
   n^.NType := GetNotificationType(Copy(Data, 1, Pos(' ', Data) - 1));
   Delete(Data, 1, Pos(' ', Data));
   n^.Data := Data;
+  // Check if already listed (no doubled notifications)
+  lst:=QueuedNotifications.LockList;
+  try
+    for i:=0 to lst.Count-1 do
+      with PNotificationData(lst[i])^ do
+        if (NType = n^.NType) and Data = n^.Data then
+        begin
+          Dispose(n);
+          Exit;
+        end;
+  finally
+    QueuedNotifications.UnlockList;
+  end;
   QueuedNotifications.Add(n);
   if FAutoSendNotifications then
     if FConnection.RecieversThreaded and Assigned(FEventThread) and

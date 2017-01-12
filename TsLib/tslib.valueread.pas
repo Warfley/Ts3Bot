@@ -11,6 +11,9 @@ procedure ReadValue(Val: String; out Result: Integer);
 procedure ReadValue(Val: String; out Result: Boolean);
 procedure ReadValue(Val: String; out Result: String);
 procedure ReadValue(Val: String; out Result: TFlagAvatar);
+procedure ReadValue(Val: String; out Result: TDynIntArray);
+
+function IsNumeric(str: String): Boolean;
 
 implementation
 
@@ -74,6 +77,42 @@ procedure ReadValue(Val: String; out Result: TFlagAvatar);
 begin
   Result:='';
   if Length(Val)=32 then Result:=Val;
+end;
+
+procedure ReadValue(Val: String; out Result: TDynIntArray);
+var sl: TStringList;
+  i: Integer;
+begin
+  sl:=TStringList.Create;
+  try
+    sl.Delimiter:=',';
+    sl.StrictDelimiter:=True;
+    sl.DelimitedText:=Val;
+    SetLength(Result, sl.Count);
+    for i:=0 to sl.Count-1 do
+      if IsNumeric(sl[i]) then
+        Result[i]:=StrToInt(sl[i])
+      else
+      begin
+        SetLength(Result, 0);
+        Break;
+      end;
+  finally
+    sl.Free;
+  end;
+end;
+
+function IsNumeric(Str: String): Boolean;
+var
+  c: Char;
+begin
+  Result:=Length(Str)>0;
+  for c in str do
+    if not c in ['0'..'9'] then
+    begin
+      Result:=False;
+      Break;
+    end;
 end;
 
 end.

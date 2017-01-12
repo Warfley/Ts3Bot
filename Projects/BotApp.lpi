@@ -104,7 +104,7 @@
         <PackageName Value="indylaz"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="9">
+    <Units Count="10">
       <Unit0>
         <Filename Value="BotApp.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -147,6 +147,11 @@
         <Filename Value="..\TsLib\include\SendNotifications.inc"/>
         <IsPartOfProject Value="True"/>
       </Unit8>
+      <Unit9>
+        <Filename Value="..\TsLib\tslib.valueread.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsLib.ValueRead"/>
+      </Unit9>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

@@ -47,10 +47,10 @@ function TTBCore.SetUp: Boolean;
 begin
   FConnection := TTsConnection.Create(FConfig.IPAddress, FConfig.Port);
   with FConnection do
-    Result:= (Connect()
-             and LogIn(FConfig.Username, FConfig.Password)
-             and SwitchServer(FConfig.ServerID)
-             );
+    Result := (Connect()
+              and LogIn(FConfig.Username, FConfig.Password)
+              and SwitchServer(FConfig.ServerID)
+              );
 end;
 
 procedure TTBCore.CleanUp;
