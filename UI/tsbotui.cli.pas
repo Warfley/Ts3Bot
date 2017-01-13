@@ -5,7 +5,7 @@ unit TsBotUI.CLI;
 interface
 
 uses
-  Classes, SysUtils, TsBotUI.Types
+  Classes, SysUtils, TsBotUI.Types, syncobjs
   {$IfDef UNIX}
   , BaseUnix, termio
   {$Else}
@@ -23,6 +23,8 @@ type
     FEventToFire: TCommandEventData;
     FOnCommandMethod: TCommandEventMethod;
     FOnCommand: TCommandEvent;
+    FPrintList: TStringList;
+    PrintListCS: TRTLCriticalSection;
     procedure FireEvent;
     function ReadDaShit(out str: string): boolean;
     procedure PrintHelp;
@@ -225,15 +227,19 @@ end;
 
 procedure TCommandLineInterface.PrintHelp;
 begin
-  WriteLn('-----------------------Commandlineinterface help-----------------------');
+  WriteLn('/----------------------Commandlineinterface help----------------------\');
   WriteLn('|       Command      |                 Description                    |');
   WriteLn('|---------------------------------------------------------------------|');
   WriteLn('|quit                | Stops the bot                                  |');
   WriteLn('|restart             | Restarts the bot                               |');
   WriteLn('|configconnection    | Change the connection data and restarts the Bot|');
+  WriteLn('|configlog           | Sets the path to the logfile                   |');
+  WriteLn('|logpath             | Displays the path to the logfile               |');
   WriteLn('|switchserver        | Switches to another virtual server             |');
+  WriteLn('|connectiondata      | Prints out the connection configuration        |');
+  WriteLn('|resetconfig         | Resets to default (empty) configuration        |');
   WriteLn('|help                | Shows this text                                |');
-  WriteLn('-----------------------------------------------------------------------');
+  WriteLn('\---------------------------------------------------------------------/');
 end;
 
 procedure TCommandLineInterface.CommandExecuted(Sender: TObject;
@@ -242,12 +248,12 @@ begin
   case Command of
     ctRestart:
       if Status then
-        WriteLn('CLI> Restart successful')
+        WriteLn('CLI> Restarting...')
       else
         WriteLn('CLI> Couln''t perform restart');
     ctQuit:
       if Status then
-        WriteLn('CLI> Shutting down')
+        WriteLn('CLI> Shutting down...')
       else
         WriteLn('CLI> Error on shutting down');
     ctSwitchServer:
@@ -260,6 +266,32 @@ begin
         WriteLn('CLI> Connection data successful set')
       else
         WriteLn('CLI> Couldn''t change connection data');
+    ctGetConnectionData:
+    begin
+      if Status then
+        Write(FPrintList.Text)
+      else
+        WriteLn('Something went wrong. This should never happen');
+      LeaveCriticalSection(PrintListCS);
+    end;
+    ctChangeLogPath:
+    if Status then
+      WriteLn('Log path successfully changed')
+    else
+      WriteLn('Something went wrong. This should never happen');
+    ctGetLogPath:
+    begin
+    if Status then
+      Write('Log:'+FPrintList.Text)
+    else
+      WriteLn('Something went wrong. This should never happen');
+    LeaveCriticalSection(PrintListCS);
+    end;
+    ctResetConfig:
+    if Status then
+      WriteLn('Config successfully reseted')
+    else
+      WriteLn('Something went wrong. This should never happen');
   end;
 end;
 
@@ -293,9 +325,9 @@ begin
         new(PConnectionData(Data));
         with PConnectionData(Data)^ do
         begin
-          Write('IP:       ');
+          Write('IP: ');
           ReadLn(IP);
-          Write('Port:     ');
+          Write('Port: ');
           ReadLn(Port);
           Write('ServerID: ');
           ReadLn(ServerID);
@@ -304,6 +336,32 @@ begin
           Write('Password: ');
           ReadLn(Password);
         end;
+      end
+      else if s='connectiondata' then
+      begin
+        EnterCriticalSection(PrintListCS);
+        FPrintList.Clear;
+        Data:=PtrInt(FPrintList);
+        CommandType:=ctGetConnectionData;
+      end
+      else if s='configlog' then
+      begin
+        New(PString(Data));
+        Write('Log path: ');
+        ReadLn(PString(Data)^);
+        CommandType:=ctChangeLogPath;
+      end
+      else if s='logpath' then
+      begin
+        EnterCriticalSection(PrintListCS);
+        FPrintList.Clear;
+        Data:=PtrInt(FPrintList);
+        CommandType:=ctGetLogPath;
+      end
+      else if s='resetconfig' then
+      begin
+        Data:=0;
+        CommandType:=ctResetConfig;
       end
       else if s = 'help' then
       begin
@@ -323,19 +381,22 @@ end;
 constructor TCommandLineInterface.Create(AOnCommand: TCommandEventMethod);
 begin
   FOnCommandMethod := AOnCommand;
-  FreeOnTerminate := True;
-  inherited Create(False);
+  Create(TCommandEvent(nil));
 end;
 
 constructor TCommandLineInterface.Create(AOnCommand: TCommandEvent);
 begin
   FOnCommand := AOnCommand;
   FreeOnTerminate := True;
+  FPrintList:=TStringList.Create;
+  InitCriticalSection(PrintListCS);
   inherited Create(False);
 end;
 
 destructor TCommandLineInterface.Destroy;
 begin
+  FPrintList.Free;
+  DoneCriticalsection(PrintListCS);
   inherited Destroy;
 end;
 

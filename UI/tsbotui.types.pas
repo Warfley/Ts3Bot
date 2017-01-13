@@ -8,7 +8,8 @@ uses
   Classes, SysUtils, gvector;
 
 type
-  TCommandType = (ctQuit, ctRestart, ctSetConnectionData, ctSwitchServer);
+  TCommandType = (ctQuit, ctRestart, ctSetConnectionData, ctSwitchServer, ctGetConnectionData,
+                 ctChangeLogPath, ctGetLogPath, ctResetConfig);
 
   PConnectionData = ^TConnectionData;
 

@@ -5,9 +5,9 @@ unit Logger;
 interface
 
 uses
-  SysUtils;
+  SysUtils, syncobjs;
 
-procedure CreateFileLogger(Path: string; DoAppend: Boolean = False);
+procedure CreateFileLogger(Path: string; DoAppend: boolean = False);
 procedure CreateDebugLogger;
 procedure DestroyFileLogger;
 procedure DestroyDebugLogger;
@@ -19,6 +19,7 @@ procedure WriteStatus(Status: string);
 implementation
 
 var
+  FileCS: TRTLCriticalSection;
   LogFile: TextFile;
   LogCreated: boolean;
   DbgLog: boolean;
@@ -28,14 +29,19 @@ procedure WriteLogLn(Line: string);
 begin
   if FileOpend then
   begin
-    WriteLn(LogFile, Line);
-    Flush(LogFile);
+    EnterCriticalsection(FileCS);
+    try
+      WriteLn(LogFile, Line);
+      Flush(LogFile);
+    finally
+      LeaveCriticalsection(FileCS);
+    end;
   end;
   if DbgLog then
     WriteLn(Line);
 end;
 
-procedure CreateFileLogger(Path: string; DoAppend: Boolean);
+procedure CreateFileLogger(Path: string; DoAppend: boolean);
 begin
   if FileOpend then
     Exit;
@@ -44,9 +50,15 @@ begin
     Append(LogFile)
   else
     Rewrite(LogFile);
+  InitCriticalSection(FileCS);
+  EnterCriticalsection(FileCS);
   FileOpend := True;
   LogCreated := True;
-  WriteLn(LogFile, '--------------Start of Service--------------');
+  try
+    WriteLn(LogFile, '--------------Start of Service--------------');
+  finally
+    LeaveCriticalsection(FileCS);
+  end;
 end;
 
 procedure CreateDebugLogger;
@@ -62,10 +74,16 @@ procedure DestroyFileLogger;
 begin
   if not FileOpend then
     Exit;
-  WriteLn(LogFile, '-----------------End of Log-----------------');
-  CloseFile(LogFile);
-  FileOpend := False;
-  LogCreated := FileOpend or DbgLog;
+  EnterCriticalsection(FileCS);
+  try
+    WriteLn(LogFile, '-----------------End of Log-----------------');
+    CloseFile(LogFile);
+    FileOpend := False;
+    LogCreated := FileOpend or DbgLog;
+  finally
+    LeaveCriticalsection(FileCS);
+    DoneCriticalsection(FileCS);
+  end;
 end;
 
 procedure DestroyDebugLogger;

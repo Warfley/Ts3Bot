@@ -23,6 +23,7 @@ type
     FAutoRestart: boolean;
     CommandCS, ConfigCS: TRTLCriticalSection;
     FIdleToTerminate: boolean;
+    function GetConfig: TConfig;
     procedure SetAutoRestart(AValue: boolean);
     procedure SleepAndCheck(Time: integer; Step: integer = 100);
     procedure RunCommands;
@@ -39,7 +40,7 @@ type
     constructor Create(AOnTerminate: TNotifyEvent; ConfPath: string;
       AAutoRestart: boolean; AIdleToTerminate: boolean = True);
     destructor Destroy; override;
-    property Config: TConfig read FConfig;
+    property Config: TConfig read GetConfig;
     property AutoRestart: boolean read FAutoRestart write SetAutoRestart;
     property IdleToTerminate: boolean read FIdleToTerminate write FIdleToTerminate;
   end;
@@ -69,7 +70,26 @@ begin
   end;
 end;
 
+function TTBCore.GetConfig: TConfig;
+begin
+  // Check if currently accessed, if so wait till it is free
+  EnterCriticalsection(ConfigCS);
+  try
+    Result:=FConfig;
+  finally
+    LeaveCriticalsection(ConfigCS);
+  end;
+end;
+
 procedure TTBCore.RunCommands;
+function ifThen(Cond: Boolean; const TStr, FStr: String): String;
+begin
+  if Cond then
+    Result:=TStr
+  else
+    Result:=FStr;
+end;
+
 var
   c: TCommandEventData;
   s: boolean;
@@ -119,6 +139,55 @@ begin
           finally
             LeaveCriticalsection(ConfigCS);
           end;
+        end;
+        ctGetConnectionData:
+        begin
+          EnterCriticalsection(ConfigCS);
+          try
+            with TStringList(c.Data) do
+            begin
+              Add(Format('IP Address: %s', [FConfig.IPAddress]));
+              Add(Format('Port: %d', [FConfig.Port]));
+              Add(Format('Server ID: %d', [FConfig.ServerID]));
+              Add(Format('Username: %s', [FConfig.Username]));
+              Add(Format('Password: %s', [FConfig.Password]));
+              Add(Format('Status: %s', [ifThen(Assigned(FConnection) And FConnection.Connected,'Connected', 'Not Connected')]));
+            end;
+            s:=True
+          finally
+            LeaveCriticalsection(ConfigCS);
+          end;
+        end;
+        ctGetLogPath:
+        begin
+          EnterCriticalsection(ConfigCS);
+          try
+            TStringList(c.Data).Add(FConfig.LogPath);
+            s:=True
+          finally
+            LeaveCriticalsection(ConfigCS);
+          end;
+        end;
+        ctChangeLogPath:
+          try
+            EnterCriticalsection(ConfigCS);
+            FConfig.LogPath := PString(c.Data)^;
+            WriteHint('Changed Logpath to file: '+FConfig.LogPath);
+            DestroyFileLogger;
+            CreateFileLogger(FConfig.LogPath);
+            s := True;
+          finally
+            LeaveCriticalsection(ConfigCS);
+            Dispose(PString(c.Data));
+          end;
+        ctResetConfig:
+        try
+          EnterCriticalsection(ConfigCS);
+          FConfig:=ReadConfig('');
+          Restart;
+          s:=True;
+        finally
+          LeaveCriticalsection(ConfigCS);
         end;
       end;
       if Assigned(c.OnFinished) then
@@ -192,7 +261,12 @@ begin
               // Start run
               Run;
             except
-              { TODO : Errorhandling }
+              on e: Exception do
+              begin
+                WriteError(-1, e.Message);
+                WriteStatus('Restarting...');
+                DoRestart:=True;
+              end;
             end;
           end
           else
