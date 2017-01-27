@@ -55,49 +55,11 @@
     Invoker: TInvokerData
   end;
 
-  TFlagAvatar =  String[32];
-
-  TDynIntArray = array of Integer;
-
-  TNotificationClientData = record
-    ID: Integer;
-    UID: String;
-    Name: String;
-    MutedInput: Boolean;
-    MutedOutput: Boolean;
-    MutedOutputOnly: Boolean;
-    InputHardware: Boolean;
-    OutputHardware: Boolean;
-    MetaData: String;
-    Recording: Boolean;
-    DatabaseID: Integer;
-    ChannelGroup: Integer;
-    ServerGroups: TDynIntArray;
-    IsAway: Boolean;
-    AfkMessage: String;
-    CType: Integer;
-    FlagAvatar: TFlagAvatar;
-    TalkPower: Integer;
-    TalkRequest: Integer;
-    TalkRequestMessage: String;
-    Description: String;
-    IsTalker: Boolean;
-    IsPrioritySpeaker: Boolean;
-    UnreadMessages: Integer;
-    PhoneticNickname: String;
-    NeededServerQuerryViewPower: Integer;
-    IconID: Integer;
-    IsChannelCommander: Boolean;
-    Country: String;
-    ChannelGroupInheritedChannel: Integer;
-    Badges: String;
-  end;
-
   TClientConnectNotification = record
     ChannelFromID: integer;
     ChannelTargetID: integer;
     Reason: TReasonData;
-    Client: TNotificationClientData;
+    Client: TClientData;
   end;
 
   TChannelEditedNotification = record

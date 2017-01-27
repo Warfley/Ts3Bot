@@ -104,7 +104,7 @@
         <PackageName Value="indylaz"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="12">
+    <Units Count="13">
       <Unit0>
         <Filename Value="BotApp.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -162,6 +162,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="TsBotUI.Types"/>
       </Unit11>
+      <Unit12>
+        <Filename Value="..\TsLib\tslib.server.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsLib.Server"/>
+      </Unit12>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

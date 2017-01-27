@@ -145,47 +145,14 @@
         ReadValue(sl.Values['cfid'], ChannelFromID);
         ReadValue(sl.Values['ctid'], ChannelTargetID);
         Reason:=ReadReasonData(sl);
-        with Client do
-        begin
-          ReadValue(sl.Values['clid'], ID);
-          ReadValue(sl.Values['client_unique_identifier'], UID);
-          ReadValue(sl.Values['client_nickname'], Name);
-          ReadValue(sl.Values['client_input_muted'], MutedInput);
-          ReadValue(sl.Values['client_output_muted'], MutedOutput);
-          ReadValue(sl.Values['client_outputonly_muted'], MutedOutputOnly);
-          ReadValue(sl.Values['client_input_hardware'], InputHardware);
-          ReadValue(sl.Values['client_output_hardware'], OutputHardware);
-          ReadValue(sl.Values['client_meta_data'], MetaData);
-          ReadValue(sl.Values['client_is_recording'], Recording);
-          ReadValue(sl.Values['client_database_id'], DatabaseID);
-          ReadValue(sl.Values['client_channel_group_id'], ChannelGroup);
-          ReadValue(sl.Values['client_servergroups'], ServerGroups);
-          ReadValue(sl.Values['client_away'], IsAway);
-          ReadValue(sl.Values['client_away_message'], AfkMessage);
-          ReadValue(sl.Values['client_type'], CType);
-          ReadValue(sl.Values['client_flag_avatar'], FlagAvatar);
-          ReadValue(sl.Values['client_talk_power'], TalkPower);
-          ReadValue(sl.Values['client_talk_request'], TalkRequest);
-          ReadValue(sl.Values['client_talk_request_msg'], TalkRequestMessage);
-          ReadValue(sl.Values['client_description'], Description);
-          ReadValue(sl.Values['client_is_talker'], IsTalker);
-          ReadValue(sl.Values['client_is_priority_speaker'], IsPrioritySpeaker);
-          ReadValue(sl.Values['client_unread_messages'], UnreadMessages);
-          ReadValue(sl.Values['client_nickname_phonetic'], PhoneticNickname);
-          ReadValue(sl.Values['client_needed_serverquery_view_power'], NeededServerQuerryViewPower);
-          ReadValue(sl.Values['client_icon_id'], IconID);
-          ReadValue(sl.Values['client_is_channel_commander'], IsChannelCommander);
-          ReadValue(sl.Values['client_country'], Country);
-          ReadValue(sl.Values['client_channel_group_inherited_channel_id'], ChannelGroupInheritedChannel);
-          ReadValue(sl.Values['client_badges'], Badges);
-        end;
       end;
-      // Send to every registered event
-      for i:=0 to Events.Connects.Count-1 do
-        Events.Connects[i](Self, Data);
     finally
       sl.Free;
     end;
+    Data.Client := n.Data;
+    // Send to every registered event
+    for i:=0 to Events.Connects.Count-1 do
+      Events.Connects[i](Self, Data);
   end;
 
   procedure SendCE(n: TNotificationData);

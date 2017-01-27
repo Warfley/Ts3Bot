@@ -4,6 +4,7 @@ unit TsBotUI.Types;
 
 interface
 
+
 uses
   Classes, SysUtils, gvector;
 

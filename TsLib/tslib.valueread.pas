@@ -12,6 +12,7 @@ procedure ReadValue(Val: String; out Result: Boolean);
 procedure ReadValue(Val: String; out Result: String);
 procedure ReadValue(Val: String; out Result: TFlagAvatar);
 procedure ReadValue(Val: String; out Result: TDynIntArray);
+procedure ReadValue(Val: String; out Result: TOperatingSystem);
 
 function IsNumeric(str: String): Boolean;
 
@@ -100,6 +101,14 @@ begin
   finally
     sl.Free;
   end;
+end;
+
+procedure ReadValue(Val: String; out Result: TOperatingSystem);
+begin
+  if Val = 'Linux' then Result:=osLinux
+  else if Val = 'Windows' then Result:=osWindows
+  else if Val = 'OS\sX' then Result:=osMacOS
+  else Result:=osOther;
 end;
 
 function IsNumeric(Str: String): Boolean;
