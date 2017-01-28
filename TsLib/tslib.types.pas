@@ -101,6 +101,47 @@ type
 
   {$EndRegion}
 
+  {$Region Channel Types}
+
+  TCodec = (ccSpeexNarrowband = 0, ccSpeexWideband, ccSpeexUltrawideband, ccCeltecMono);
+
+  TChannelData = record
+    Name: String;
+    ID: Integer;
+    ParentID: Integer;
+    Description: String;
+    Topic: String;
+    HasPassword: Boolean;
+    Password: String;
+    PhoneticName: String;
+
+    Codec: TCodec;
+    CodecQuality: Integer;
+
+    MaxClients: Integer;
+    MaxClientsFamily: Integer;
+
+    IsPermament: Boolean;
+    IsSemipermament: Boolean;
+    IsTemporary: Boolean;
+    IsDefault: Boolean;
+
+    IsUnlimited: Boolean;
+    IsFamilyUnlimited: Boolean;
+    Order: Integer;
+
+    Talkpower: Integer;
+
+    FilePath: String;
+
+    IsSilenced: Boolean;
+    Icon: String;
+
+    Unencrypted: Boolean;
+  end;
+
+  {$EndRegion}
+
   {$Region Client Types}
 
   TFlagAvatar = string[32];
@@ -168,7 +209,10 @@ operator := (Str: string) Client: TClientData;
 procedure SetClientData(Name: String; Value: String; var Client: TClientData);
 
 operator := (Str: string) Server: TServerData;
-procedure SetServerData(Name: String; Value: String; var Server: TClientData);
+procedure SetServerData(Name: String; Value: String; var Server: TServerData);
+
+operator := (Str: string) Channel: TChannelData;
+procedure SetChannelData(Name: String; Value: String; var Channel: TChannelData);
 
 function GetNotificationType(Str: string): TNotificationType;
 
@@ -278,9 +322,9 @@ begin
     sl.DelimitedText := Str;
     for i:=0 to sl.Count-1 do
       if sl.Names[i]='' then
-        SetClientData(sl[i], '', Client)
+        SetClientData(sl[i], '', Server)
       else
-        SetServerData(sl.Names[i], sl.ValueFromIndex[i], Client);
+        SetServerData(sl.Names[i], sl.ValueFromIndex[i], Server);
   finally
     sl.Free;
   end;
@@ -291,6 +335,36 @@ begin
   with Server do
     if Name = 'virtualserver_unique_identifier' then
       ReadValue(Value, UID)
+      { TODO : Finish }
+end;
+
+
+operator := (Str: string) Channel: TChannelData;
+var
+  sl: TStringList;
+begin
+  Finalize(Channel);
+  FillChar(Channel,SizeOf(Channel), 0);
+  sl := TStringList.Create;
+  try
+    sl.Delimiter := ' ';
+    sl.StrictDelimiter := True;
+    sl.DelimitedText := Str;
+    for i:=0 to sl.Count-1 do
+      if sl.Names[i]='' then
+        SetClientData(sl[i], '', Channel)
+      else
+        SetChannelData(sl.Names[i], sl.ValueFromIndex[i], Channel);
+  finally
+    sl.Free;
+  end;
+end;
+
+procedure SetChannelData(Name: String; Value: String; var Channel: TChannelData);
+begin
+  with Channel do
+    if Name = 'cid' then
+      ReadValue(Value, ID)
       { TODO : Finish }
 end;
 
