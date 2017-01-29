@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, TsBot.Config, Logger, TsLib.Types, TsLib.Connection,
-  TsLib.NotificationManager, TsBotUI.Types, syncobjs;
+  TsLib.NotificationManager, TsBotUI.Types, syncobjs, TsLib.Server;
 
 type
 
@@ -227,13 +227,23 @@ begin
 end;
 
 procedure TTBCore.Run;
+var
+  FServer: TTsServer;
 begin
-  while not (Terminated or DoRestart) do
-  begin
-    Sleep(100);
-    RunCommands;
+  FServer:=TTsServer.Create(FConnection, FNotificationManager);
+  try
+    WriteStatus('Requesting serverdata');
+    FServer.UpdateServerData;
+
+    while not (Terminated or DoRestart) do
+    begin
+      Sleep(100);
+      RunCommands;
+    end;
+    { TODO : Implement Something here }
+  finally
+    FServer.Free;
   end;
-  { TODO : Implement Something here }
 end;
 
 procedure TTBCore.Execute;

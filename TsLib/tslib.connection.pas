@@ -32,6 +32,7 @@ type
     FOnLogin: TNotifyEvent;
     FWaitingForStatus: boolean;
     FLastError: TStatusResponse;
+    FLastMessage: String;
     FServerID: integer;
     FSyncData, FSyncRecievers: TRTLCriticalSection;
     FIncomeData: string;
@@ -54,6 +55,7 @@ type
     procedure DeleteReciever(Reciever: TRecieveEvent);
     procedure SendCommand(Cmd: string);
     function ExecCommand(Cmd: string): TStatusResponse;
+    function ExecCommand(Cmd: string; var Response: String): TStatusResponse;
     function LogIn(Username, Password: string): boolean;
     function SwitchServer(NewSID: integer): boolean;
     procedure LogOut;
@@ -134,9 +136,14 @@ end;
 
 function TTsConnection.RecieveStatus(Sender: TObject; Data: string;
   var RemoveFromList: boolean): boolean;
+var
+  sl: TStringList;
+  ErrorString: String;
 begin
   Data := Trim(Data);
-  if not AnsiStartsStr('error id=', Data) then
+  Result:=not AnsiStartsStr('notify', Data);
+  RemoveFromList:=False;
+  if not Result then
   begin
     // Not Processed
     Result := False;
@@ -144,19 +151,36 @@ begin
     Exit;
   end;
 
-  // Get the number
-  Delete(Data, 1, 9);
-  FLastError.ErrNo := StrToInt(Copy(Data, 1, Pos(' ', Data) - 1));
-  // Get the Message
-  Delete(Data, 1, Pos('=', Data));
-  FLastError.Msg := Trim(Data);
+  sl:=TStringList.Create;
+  try
+    sl.Text:=Data;
+  if ((sl.Count > 0) And AnsiStartsStr('error id=', Trim(sl[sl.Count-1]))) then
+  begin
+    //Last part recieved
+  ErrorString := Trim(sl[sl.Count-1]);
 
+  // Get the number
+  Delete(ErrorString, 1, 9);
+  FLastError.ErrNo := StrToInt(Copy(ErrorString, 1, Pos(' ', ErrorString) - 1));
+  // Get the Message
+  Delete(ErrorString, 1, Pos('=', ErrorString));
+  FLastError.Msg := Trim(ErrorString);
+
+  sl.Delete(sl.Count-1);
   // Take away the reciever and the message
-  Result := True;
-  RemoveFromList := True;
+    RemoveFromList := True;
+  end;
+
+  FLastMessage+=sl.Text;
+
+
+  finally
+    sl.Free;
+  end;
 
   // unblock the waiting status
-  FWaitingForStatus := False;
+  if RemoveFromList then
+    FWaitingForStatus := False;
 end;
 
 procedure TTsConnection.TelnetCommand(Sender: TIdTelnet; Status: TIdTelnetCommand);
@@ -315,6 +339,7 @@ function TTsConnection.ExecCommand(Cmd: string): TStatusResponse;
 var
   i: integer;
 begin
+  FLastMessage:='';
   while FWaitingForStatus do //Someone waiting for another command
     Sleep(100);
 
@@ -354,6 +379,13 @@ begin
   end;
   // Return result
   Result := FLastError;
+end;
+
+function TTsConnection.ExecCommand(Cmd: string; var Response: String
+  ): TStatusResponse;
+begin
+  Result:=ExecCommand(Cmd);
+  Response:=FLastMessage;
 end;
 
 function TTsConnection.LogIn(Username, Password: string): boolean;
