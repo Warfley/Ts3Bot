@@ -18,9 +18,7 @@ type
     UpdateServerData: Integer;
     UpdateChannelList: Integer;
     UpdateClientList: Integer;
-    FloodReduce: Integer;
-    FloodCommandBan: Integer;
-    FloodIPBan: Integer;
+    FloodCommands, FloodTime: Integer;
   end;
 
 const
@@ -28,8 +26,8 @@ const
     IPAddress: '127.0.0.1'; Port: 10011; ServerID: 1;
     LogPath: {$IfDef DEBUG}'./log.txt'{$Else}''{$EndIf};
     UpdateServerData: -1; UpdateChannelList: 10000;
-    UpdateClientList: 1000; FloodReduce: -1;
-    FloodCommandBan: -1; FloodIPBan: -1);
+    UpdateClientList: 1000; FloodCommands: -1;
+    FloodTime: -1);
   ConfigVersion = 1;
 
 function ReadConfig(Path: string): TConfig;
@@ -126,17 +124,13 @@ end;
     if not Assigned(Node) then
       Exit;
 
-    attr := Node.AttribStrings['Reduce'];
+    attr := Node.AttribStrings['Time'];
     if IsNumeric(attr) then
-      Result.FloodReduce := StrToInt(attr);
+      Result.FloodTime := StrToInt(attr);
 
-    attr := Node.AttribStrings['CommandBan'];
+    attr := Node.AttribStrings['Commands'];
     if IsNumeric(attr)then
-      Result.FloodCommandBan := StrToInt(attr);
-
-    attr := Node.AttribStrings['IPBan'];
-    if IsNumeric(attr) then
-      Result.FloodIPBan := StrToInt(attr);
+      Result.FloodCommands := StrToInt(attr);
   end;
 
 var
@@ -149,6 +143,7 @@ begin
   try
     ReadLoginData(doc);
     ReadUpdateInterval(doc);
+    ReadFloodControl(doc);
   finally
     doc.Free;
   end;
@@ -197,9 +192,8 @@ begin
     RootNode.AppendChild(ParentNode);
 
     // Adding update intervalls
-    TDOMElement(ParentNode).SetAttribute('Reduce', IntToStr(Config.FloodReduce));
-    TDOMElement(ParentNode).SetAttribute('CommandBan', IntToStr(Config.FloodCommandBan));
-    TDOMElement(ParentNode).SetAttribute('IPBan', IntToStr(Config.FloodIPBan));
+    TDOMElement(ParentNode).SetAttribute('Time', IntToStr(Config.FloodTime));
+    TDOMElement(ParentNode).SetAttribute('Commands', IntToStr(Config.FloodCommands));
 
     WriteXMLFile(doc, Path);
   finally

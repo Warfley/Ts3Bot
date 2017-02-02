@@ -66,9 +66,49 @@ begin
     if Val[i] = '\' then
     begin
       case Val[i+1] of
+      '\':
+      begin
+        Result[pos]:='\';
+        inc(pos);
+      end;
+      '/':
+      begin
+        Result[pos]:='/';
+        inc(pos);
+      end;
       's':
       begin
         Result[pos]:=' ';
+        inc(pos);
+      end;
+      'p':
+      begin
+        Result[pos]:='|';
+        inc(pos);
+      end;
+      'a':
+      begin
+        Result[pos]:=#7;
+        inc(pos);
+      end;
+      'b':
+      begin
+        Result[pos]:=#8;
+        inc(pos);
+      end;
+      'f':
+      begin
+        Result[pos]:=#12;
+        inc(pos);
+      end;
+      'n':
+      begin
+        Result[pos]:=#10;
+        inc(pos);
+      end;
+      'r':
+      begin
+        Result[pos]:=#13;
         inc(pos);
       end;
       't':
@@ -76,14 +116,9 @@ begin
         Result[pos]:=#9;
         inc(pos);
       end;
-      '\':
+      'v':
       begin
-        Result[pos]:='\';
-        inc(pos);
-      end;
-      'n':
-      begin
-        Result[pos]:=#10;
+        Result[pos]:=#11;
         inc(pos);
       end;
       end;

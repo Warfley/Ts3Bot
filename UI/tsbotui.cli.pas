@@ -145,10 +145,13 @@ function TCommandLineInterface.ReadDaShit(out str: string): boolean;
 var
   c: char;
   currPos: integer;
+  maxpos: Integer;
+  spaces: String;
 begin
   str := '';
   c := #0;
   currPos := 1;
+  maxpos:=1;
   while not (c in [#13, #10]) and not Terminated do
   begin
     c := ReadChar(False);
@@ -189,6 +192,8 @@ begin
         currPos := min(currPos + 1, Length(str) + 1);
     {$EndIf}
     end;
+    if currPos>maxpos then
+      maxpos:=currPos;
     if c in [
 {$IFDEF Windows} #4, #6 {$Else}
       #37, #39
@@ -199,18 +204,11 @@ begin
     end
     else if c <> #0 then
     begin
-      {$IfDef WINDOWS}
-      if c in [#9, #32..#45, #47..#255] then
-        Write(#13, 'CLI> ',str)
-      else
-      begin
-        Write(#13);
-        ClrEol;
-        Write('CLI> ', str);
-      end;
-      {$Else}
-      Write(#13, 'CLI> ', str);
-      {$EndIf}
+      SetLength(spaces, maxpos-currPos);
+      if maxpos-currPos>0 then
+        FillChar(spaces[1], maxpos-currPos, ' ');
+      maxpos:=1;
+      Write(#13, 'CLI> ', str, spaces);
       GotoX(currPos + 5);
     end;
     Sleep(10);
@@ -231,6 +229,8 @@ begin
   WriteLn('|logpath             | Displays the path to the logfile               |');
   WriteLn('|switchserver        | Switches to another virtual server             |');
   WriteLn('|connectiondata      | Prints out the connection configuration        |');
+  WriteLn('|getantiflood        | Prints out the Antiflood configuration         |');
+  WriteLn('|configantiflood     | Sets the antiflood configuration               |');
   WriteLn('|resetconfig         | Resets to default (empty) configuration        |');
   WriteLn('|help                | Shows this text                                |');
   WriteLn('\---------------------------------------------------------------------/');
@@ -281,6 +281,19 @@ begin
       WriteLn('Something went wrong. This should never happen');
     LeaveCriticalSection(PrintListCS);
     end;
+    ctGetAntiflood:
+    begin
+    if Status then
+      Write('Antiflood:'+LineEnding+FPrintList.Text)
+    else
+      WriteLn('Something went wrong. This should never happen');
+    LeaveCriticalSection(PrintListCS);
+    end;
+    ctSetAntiflood:
+    if Status then
+      WriteLn('Antiflood successfully configured')
+    else
+      WriteLn('Something went wrong. This should never happen');
     ctResetConfig:
     if Status then
       WriteLn('Config successfully reseted')
@@ -351,6 +364,22 @@ begin
         FPrintList.Clear;
         Data:=PtrInt(FPrintList);
         CommandType:=ctGetLogPath;
+      end
+      else if s='configantiflood' then
+      begin
+        New(PAntiFloodInfo(Data));
+        Write('Commands: ');
+        ReadLn(PAntiFloodInfo(Data)^.Commands);
+        Write('Time: ');
+        ReadLn(PAntiFloodInfo(Data)^.Time);
+        CommandType:=ctSetAntiflood;
+      end
+      else if s='getantiflood' then
+      begin
+        EnterCriticalSection(PrintListCS);
+        FPrintList.Clear;
+        Data:=PtrInt(FPrintList);
+        CommandType:=ctGetAntiflood;
       end
       else if s='resetconfig' then
       begin

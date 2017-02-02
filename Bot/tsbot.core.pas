@@ -203,6 +203,27 @@ begin
             LeaveCriticalsection(ConfigCS);
             Dispose(PString(c.Data));
           end;
+        ctGetAntiflood:
+        begin
+          EnterCriticalsection(ConfigCS);
+          try
+            TStringList(c.Data).Add(Format('%d commands per %d seconds', [FConfig.FloodCommands, FConfig.FloodTime]));
+            s := True
+          finally
+            LeaveCriticalsection(ConfigCS);
+          end;
+        end;
+        ctSetAntiflood:
+          try
+            EnterCriticalsection(ConfigCS);
+            FConfig.FloodCommands := PAntiFloodInfo(c.Data)^.Commands;
+            FConfig.FloodTime := PAntiFloodInfo(c.Data)^.Time;
+            FConnection.FloodControl(FConfig.FloodCommands, FConfig.FloodTime);
+            s := True;
+          finally
+            LeaveCriticalsection(ConfigCS);
+            Dispose(PAntiFloodInfo(c.Data));
+          end;
         ctResetConfig:
           try
             EnterCriticalsection(ConfigCS);
@@ -251,7 +272,7 @@ begin
   try
     DoRestart := False;
     FConnection := TTsConnection.Create(FConfig.IPAddress, FConfig.Port);
-    FConnection.FloodControl(FConfig.FloodReduce, FConfig.FloodIPBan, FConfig.FloodCommandBan);
+    FConnection.FloodControl(FConfig.FloodCommands, FConfig.FloodTime);
     with FConnection do
       Result := (Connect() and LogIn(FConfig.Username, FConfig.Password) and
         SwitchServer(FConfig.ServerID));
@@ -266,9 +287,9 @@ procedure TTBCore.CleanUp;
 begin
   if Assigned(FConnection) then
   begin
+    FreeAndNil(FNotificationManager);
     FConnection.LogOut;
     FConnection.Disconnect();
-    FreeAndNil(FNotificationManager);
     FreeAndNil(FConnection);
   end;
 end;

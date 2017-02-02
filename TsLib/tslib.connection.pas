@@ -7,6 +7,7 @@ interface
 uses
   Classes, SysUtils,
   TsLib.Types,
+  TsLib.ValueRead,
   // Required for indy
   Interfaces,
   // indy
@@ -21,9 +22,8 @@ type
   { TTsConnection }
 
   TAntiFloodData = record
-    UseAntiFlood: Boolean;
-    TickReduce: Integer;
-    Count, Ban, CommandBan: Integer;
+    UseAntiflood: Boolean;
+    Commands, Time: Integer;
   end;
 
   TTsConnection = class
@@ -44,6 +44,7 @@ type
     FIncomeData: string;
     FAntiFloodShit: QWord;
     FAntiFloodData: TAntiFloodData;
+    FAntiFloodConf: TAntiFloodData;
     function RecieveStatus(Sender: TObject; Data: string;
       var RemoveFromList: boolean): boolean;
     function getConnected: boolean;
@@ -55,7 +56,8 @@ type
     procedure TelnetDataAvailable(Sender: TIdTelnet; const Buffer: TIdBytes);
     procedure TelnetDisconnected(Sender: TObject);
   public
-    procedure FloodControl(Reduce, Ban, Command: Integer);
+    procedure ClearReciever;
+    procedure FloodControl(Count, Time: Integer);
     constructor Create(Host: string; Port: integer);
     destructor Destroy; override;
     function Connect: boolean;
@@ -173,7 +175,7 @@ begin
   FLastError.ErrNo := StrToInt(Copy(ErrorString, 1, Pos(' ', ErrorString) - 1));
   // Get the Message
   Delete(ErrorString, 1, Pos('=', ErrorString));
-  FLastError.Msg := Trim(ErrorString);
+  ReadValue(Trim(ErrorString), FLastError.Msg);
 
   sl.Delete(sl.Count-1);
   // Take away the reciever and the message
@@ -233,13 +235,21 @@ begin
     FOnDisconnected(Self);
 end;
 
-procedure TTsConnection.FloodControl(Reduce, Ban, Command: Integer);
+procedure TTsConnection.ClearReciever;
 begin
-    FAntiFloodData.UseAntiFlood:= (Reduce = -1) and (Ban=-1) and (Command =-1);
-    FAntiFloodData.Ban:=Ban;
-    FAntiFloodData.Count:=60;
-    FAntiFloodData.TickReduce:=Reduce;
-    FAntiFloodData.CommandBan:=Command;
+  EnterCriticalsection(FSyncRecievers);
+  try
+    Recievers.Clear;
+  finally
+    LeaveCriticalsection(FSyncRecievers);
+  end;
+end;
+
+procedure TTsConnection.FloodControl(Count, Time: Integer);
+begin
+    FAntiFloodData.UseAntiFlood:= (Count >0) and (Time>0);
+    FAntiFloodData.Commands:=Count;
+    FAntiFloodData.Time:=Time;
     FAntiFloodShit:=GetTickCount64;
 end;
 
@@ -264,7 +274,6 @@ begin
   TelnetConnection.OnConnected := @TelnetConnected;
   TelnetConnection.OnDisconnected := @TelnetDisconnected;
   TelnetConnection.OnTelnetCommand := @TelnetCommand;
-
   //Not logged in
   FLoggedIn := False;
 end;
@@ -299,26 +308,11 @@ begin
     on e: Exception do
       WriteError(1, e.Message);
   end;
-
   Result := TelnetConnection.Connected;
 end;
 
 procedure TTsConnection.Disconnect;
-var diff: QWord;
 begin
-  if FAntiFloodData.UseAntiFlood then
-  begin
-    Diff:=(GetTickCount64-FAntiFloodShit) div 500;
-    FAntiFloodShit:=GetTickCount64;
-    if diff*FAntiFloodData.TickReduce >FAntiFloodData.Count then
-      FAntiFloodData.Count:=0
-    else
-      FAntiFloodData.Count-=Diff*FAntiFloodData.TickReduce;
-
-    if FAntiFloodData.Count>FAntiFloodData.CommandBan-50 then
-        sleep((FAntiFloodData.Count-FAntiFloodData.CommandBan-50)*500 div FAntiFloodData.TickReduce);
-    FAntiFloodData.Count += 50;
-  end;
   // exit if no active connection
   if not Connected then
     exit;
@@ -375,16 +369,19 @@ var
 begin
   if FAntiFloodData.UseAntiFlood then
   begin
-    Diff:=(GetTickCount64-FAntiFloodShit) div 500;
+    Diff:=GetTickCount64-FAntiFloodShit;
     FAntiFloodShit:=GetTickCount64;
-    if diff*FAntiFloodData.TickReduce >FAntiFloodData.Count then
-      FAntiFloodData.Count:=0
+    if Diff>FAntiFloodConf.Time then
+    begin
+      FAntiFloodConf.Time:=FAntiFloodData.Time*1000;
+      FAntiFloodConf.Commands:=FAntiFloodData.Commands;
+    end
     else
-      FAntiFloodData.Count-=Diff*FAntiFloodData.TickReduce;
-
-    if FAntiFloodData.Count>FAntiFloodData.CommandBan-50 then
-        sleep((FAntiFloodData.Count-FAntiFloodData.CommandBan-50)*500 div FAntiFloodData.TickReduce);
-    FAntiFloodData.Count += 50;
+      dec(FAntiFloodConf.Time, diff);
+    if FAntiFloodConf.Commands>0 then
+      dec(FAntiFloodConf.Commands)
+    else
+      Sleep(FAntiFloodConf.Time);
   end;
 
   FLastMessage:='';

@@ -10,7 +10,7 @@ uses
 
 type
   TCommandType = (ctQuit, ctRestart, ctSetConnectionData, ctSwitchServer, ctGetConnectionData,
-                 ctChangeLogPath, ctGetLogPath, ctResetConfig);
+                 ctChangeLogPath, ctGetLogPath, ctResetConfig, ctGetAntiflood, ctSetAntiflood);
 
   PConnectionData = ^TConnectionData;
 
@@ -20,6 +20,12 @@ type
     ServerID: integer;
     UserName: string;
     Password: string;
+  end;
+
+  PAntiFloodInfo = ^TAntiFloodInfo;
+
+  TAntiFloodInfo = record
+    Time, Commands: Integer;
   end;
 
   TCommandFinishedEvent = procedure(Sender: TObject; Command: TCommandType;
