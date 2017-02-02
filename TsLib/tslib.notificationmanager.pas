@@ -20,10 +20,8 @@ type
     Events: TEventLists;
     QueuedNotifications: TThreadList;
     FActive: boolean;
-    ListeningChannels: TIntegerList;
     function GetNotificationsAvailable: Boolean;
     procedure SetActive(AValue: boolean);
-    procedure AddListeningChannel(ChannelID: integer);
   protected
     function NotificationRecieved(Sender: TObject; Data: string;
       var RemoveFromList: boolean): boolean;
@@ -38,14 +36,11 @@ type
 
     procedure RegisterText(Event: TTextNotificationEvent);
     procedure RegisterServerEdit(Event: TServerEditNotificationEvent);
-    procedure RegisterClientMove(Event: TClientMoveNotificationEvent;
-      ChannelID: integer);
+    procedure RegisterClientMove(Event: TClientMoveNotificationEvent);
     procedure RegisterDisconnect(Event: TClientDCNotificationEvent);
     procedure RegisterConnect(Event: TClientConnectNotificationEvent);
-    procedure RegisterChannelEdit(Event: TChannelEditedNotificationEvent;
-      ChannelID: integer);
-    procedure RegisterChannelDescription(Event: TChannelDescriptionChangedEvent;
-      ChannelID: integer);
+    procedure RegisterChannelEdit(Event: TChannelEditedNotificationEvent);
+    procedure RegisterChannelDescription(Event: TChannelDescriptionChangedEvent);
 
     procedure UnregisterNotification(EventType: TNotificationType; Event: TMethod);
     property Active: boolean read FActive write SetActive;
@@ -79,17 +74,6 @@ begin
     Result:=QueuedNotifications.LockList.Count>0;
   finally
     QueuedNotifications.UnlockList;
-  end;
-end;
-
-procedure TNotificationManager.AddListeningChannel(ChannelID: integer);
-begin
-  if ListeningChannels.IndexOf(ChannelID) = -1 then
-  begin
-    ListeningChannels.Add(ChannelID);
-    if Active then
-      FConnection.ExecCommand('servernotifyregister event=channel id=' +
-        IntToStr(ChannelID));
   end;
 end;
 
@@ -134,7 +118,6 @@ end;
 constructor TNotificationManager.Create(Connection: TTsConnection);
 begin
   FConnection := Connection;
-  ListeningChannels := TIntegerList.Create;
   QueuedNotifications := TThreadList.Create;
   with Events do
   begin
@@ -166,10 +149,7 @@ begin
   FConnection.ExecCommand('servernotifyregister event=textprivate');
   FConnection.ExecCommand('servernotifyregister event=server');
   FConnection.ExecCommand('servernotifyregister event=textserver');
-  // Register Channel events
-  for i := 0 to ListeningChannels.Count - 1 do
-    FConnection.ExecCommand('servernotifyregister event=channel id=' +
-      IntToStr(ListeningChannels[i]));
+  FConnection.ExecCommand('servernotifyregister event=channel id=0');
   FActive := True;
 end;
 
@@ -198,6 +178,7 @@ begin
   finally
     QueuedNotifications.UnlockList;
   end;
+  QueuedNotifications.Clear;
 end;
 
 procedure TNotificationManager.Stop;
@@ -224,7 +205,6 @@ destructor TNotificationManager.Destroy;
 begin
   Stop;
 
-  ListeningChannels.Free;
   ClearNotifications;
   QueuedNotifications.Free;
 
@@ -270,7 +250,6 @@ begin
     ChannelEdits.Clear;
     DescriptionChanges.Clear;
   end;
-  ListeningChannels.Clear;
 end;
 
 procedure TNotificationManager.RegisterText(Event: TTextNotificationEvent);
@@ -283,11 +262,10 @@ begin
   Events.ServerEdits.Add(Event);
 end;
 
-procedure TNotificationManager.RegisterClientMove(Event: TClientMoveNotificationEvent;
-  ChannelID: integer);
+procedure TNotificationManager.RegisterClientMove(
+  Event: TClientMoveNotificationEvent);
 begin
   Events.ClientMoves.Add(Event);
-  AddListeningChannel(ChannelID);
 end;
 
 procedure TNotificationManager.RegisterDisconnect(Event: TClientDCNotificationEvent);
@@ -301,17 +279,15 @@ begin
 end;
 
 procedure TNotificationManager.RegisterChannelEdit(
-  Event: TChannelEditedNotificationEvent; ChannelID: integer);
+  Event: TChannelEditedNotificationEvent);
 begin
   Events.ChannelEdits.Add(Event);
-  AddListeningChannel(ChannelID);
 end;
 
 procedure TNotificationManager.RegisterChannelDescription(
-  Event: TChannelDescriptionChangedEvent; ChannelID: integer);
+  Event: TChannelDescriptionChangedEvent);
 begin
   Events.DescriptionChanges.Add(Event);
-  AddListeningChannel(ChannelID);
 end;
 
 procedure TNotificationManager.UnregisterNotification(EventType: TNotificationType;

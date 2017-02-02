@@ -124,6 +124,9 @@ type
 
   TCodec = (ccSpeexNarrowband = 0, ccSpeexWideband, ccSpeexUltrawideband, ccCeltecMono);
 
+  TChannelUpdate = (cuTopic, cuFlags, cuVoice, cuLimits, cuIcon, cuSecondsEmpty);
+  TChannelUpdates = set of TChannelUpdate;
+
   TChannelData = record
     Name: String;
     ID: Integer;
@@ -132,31 +135,40 @@ type
     Topic: String;
     HasPassword: Boolean;
     Password: String;
+    PasswordSalt: String;
     PhoneticName: String;
 
     Codec: TCodec;
     CodecQuality: Integer;
+    CodecLatencyFactor: Integer;
 
     MaxClients: Integer;
     MaxClientsFamily: Integer;
+    FamilyClients: Integer;
+    Clients: Integer;
+    DeleteDelay: Integer;
 
     IsPermament: Boolean;
     IsSemipermament: Boolean;
     IsTemporary: Boolean;
     IsDefault: Boolean;
+    IsPrivate: Boolean;
 
     IsUnlimited: Boolean;
     IsFamilyUnlimited: Boolean;
     Order: Integer;
+    IsMaxClientsInherited: Integer;
 
     Talkpower: Integer;
+    SubscribePower: Integer;
 
     FilePath: String;
 
     IsSilenced: Boolean;
-    Icon: String;
+    IconID: Integer;
 
     Unencrypted: Boolean;
+    SecondsEmpty: Integer;
   end;
 
   {$EndRegion}
@@ -225,18 +237,22 @@ type
   end;
 
 operator := (Str: string) Client: TClientData;
-procedure SetClientData(Name: String; Value: String; var Client: TClientData);
+procedure SetClientData(AName: String; Value: String; var Client: TClientData);
 
 operator := (Str: string) Server: TServerData;
-procedure SetServerData(Name: String; Value: String; var Server: TServerData);
+procedure SetServerData(AName: String; Value: String; var Server: TServerData);
 
 operator := (Str: string) Connection: TConnectionData;
-procedure SetConnectionData(Name: String; Value: String; var Connection: TConnectionData);
+procedure SetConnectionData(AName: String; Value: String; var Connection: TConnectionData);
 
 operator := (Str: string) Channel: TChannelData;
-procedure SetChannelData(Name: String; Value: String; var Channel: TChannelData);
+procedure SetChannelData(AName: String; Value: String; var Channel: TChannelData);
 
 function GetNotificationType(Str: string): TNotificationType;
+
+const
+  FullChannelUpdate = [cuTopic..cuSecondsEmpty];
+  DefaultChannelUpdate = [cuSecondsEmpty];
 
 implementation
 
@@ -247,6 +263,8 @@ var
   sl: TStringList;
   i: Integer;
 begin
+  Finalize(Client);
+  FillByte(Client, SizeOf(Client), 0);
   sl := TStringList.Create;
   try
     sl.Delimiter := ' ';
@@ -262,71 +280,71 @@ begin
   end;
 end;
 
-procedure SetClientData(Name: String; Value: String; var Client: TClientData);
+procedure SetClientData(AName: String; Value: String; var Client: TClientData);
 begin
   with Client do
-    if Name = 'clid' then
+    if AName = 'clid' then
       ReadValue(Value, ID)
-    else if Name = 'client_unique_identifier' then
+    else if AName = 'client_unique_identifier' then
       ReadValue(Value, UID)
-    else if Name = 'client_nickname' then
+    else if AName = 'client_nickname' then
       ReadValue(Value, Name)
-    else if Name = 'client_input_muted' then
+    else if AName = 'client_input_muted' then
       ReadValue(Value, MutedInput)
-    else if Name = 'client_output_muted' then
+    else if AName = 'client_output_muted' then
       ReadValue(Value, MutedOutput)
-    else if Name = 'client_outputonly_muted' then
+    else if AName = 'client_outputonly_muted' then
       ReadValue(Value, MutedOutputOnly)
-    else if Name = 'client_input_hardware' then
+    else if AName = 'client_input_hardware' then
       ReadValue(Value, InputHardware)
-    else if Name = 'client_output_hardware' then
+    else if AName = 'client_output_hardware' then
       ReadValue(Value, OutputHardware)
-    else if Name = 'client_meta_data' then
+    else if AName = 'client_meta_data' then
       ReadValue(Value, MetaData)
-    else if Name = 'client_is_recording' then
+    else if AName = 'client_is_recording' then
       ReadValue(Value, Recording)
-    else if Name = 'client_database_id' then
+    else if AName = 'client_database_id' then
       ReadValue(Value, DatabaseID)
-    else if Name = 'client_channel_group_id' then
+    else if AName = 'client_channel_group_id' then
       ReadValue(Value, ChannelGroup)
-    else if Name = 'client_servergroups' then
+    else if AName = 'client_servergroups' then
       ReadValue(Value, ServerGroups)
-    else if Name = 'client_away' then
+    else if AName = 'client_away' then
       ReadValue(Value, IsAway)
-    else if Name = 'client_away_message' then
+    else if AName = 'client_away_message' then
       ReadValue(Value, AfkMessage)
-    else if Name = 'client_type' then
+    else if AName = 'client_type' then
       ReadValue(Value, CType)
-    else if Name = 'client_flag_avatar' then
+    else if AName = 'client_flag_avatar' then
       ReadValue(Value, FlagAvatar)
-    else if Name = 'client_talk_power' then
+    else if AName = 'client_talk_power' then
       ReadValue(Value, TalkPower)
-    else if Name = 'client_talk_request' then
+    else if AName = 'client_talk_request' then
       ReadValue(Value, TalkRequest)
-    else if Name = 'client_talk_request_msg' then
+    else if AName = 'client_talk_request_msg' then
       ReadValue(Value, TalkRequestMessage)
-    else if Name = 'client_description' then
+    else if AName = 'client_description' then
       ReadValue(Value, Description)
-    else if Name = 'client_is_talker' then
+    else if AName = 'client_is_talker' then
       ReadValue(Value, IsTalker)
-    else if Name = 'client_is_priority_speaker' then
+    else if AName = 'client_is_priority_speaker' then
       ReadValue(Value, IsPrioritySpeaker)
-    else if Name = 'client_unread_messages' then
+    else if AName = 'client_unread_messages' then
       ReadValue(Value, UnreadMessages)
-    else if Name = 'client_nickname_phonetic' then
+    else if AName = 'client_nickname_phonetic' then
       ReadValue(Value, PhoneticNickname)
-    else if Name = 'client_needed_serverquery_view_power' then
+    else if AName = 'client_needed_serverquery_view_power' then
       ReadValue(Value, NeededServerQuerryViewPower)
-    else if Name = 'client_icon_id' then
+    else if AName = 'client_icon_id' then
       ReadValue(Value, IconID)
-    else if Name = 'client_is_channel_commander' then
+    else if AName = 'client_is_channel_commander' then
       ReadValue(Value, IsChannelCommander)
-    else if Name = 'client_country' then
+    else if AName = 'client_country' then
       ReadValue(Value, Country)
-    else if Name = 'client_channel_group_inherited_channel_id' then
+    else if AName = 'client_channel_group_inherited_channel_id' then
       ReadValue(Value,
         ChannelGroupInheritedChannel)
-    else if Name = 'client_badges' then
+    else if AName = 'client_badges' then
       ReadValue(Value, Badges);
 end;
 
@@ -335,6 +353,8 @@ var
   sl: TStringList;
   i: Integer;
 begin
+  Finalize(Server);
+  FillByte(Server, SizeOf(Server), 0);
   sl := TStringList.Create;
   try
     sl.Delimiter := ' ';
@@ -351,152 +371,152 @@ begin
   end;
 end;
 
-procedure SetServerData(Name: String; Value: String; var Server: TServerData);
+procedure SetServerData(AName: String; Value: String; var Server: TServerData);
 begin
   with Server do
-    if Name = 'virtualserver_unique_identifier' then
+    if AName = 'virtualserver_unique_identifier' then
       ReadValue(Value, UID)
-    else if Name = 'virtualserver_name' then
+    else if AName = 'virtualserver_name' then
       ReadValue(Value, Name)
-    else if Name = 'virtualserver_welcomemessage' then
+    else if AName = 'virtualserver_welcomemessage' then
       ReadValue(Value, WelcomeMessage)
-    else if Name = 'virtualserver_platform' then
+    else if AName = 'virtualserver_platform' then
       ReadValue(Value, Platform)
-    else if Name = 'virtualserver_version' then
+    else if AName = 'virtualserver_version' then
       ReadValue(Value, Version)
-    else if Name = 'virtualserver_maxclients' then
+    else if AName = 'virtualserver_maxclients' then
       ReadValue(Value, MaxClients)
-    else if Name = 'virtualserver_password' then
+    else if AName = 'virtualserver_password' then
       ReadValue(Value, Password)
-    else if Name = 'virtualserver_clientsonline' then
+    else if AName = 'virtualserver_clientsonline' then
       ReadValue(Value, Clients)
-    else if Name = 'virtualserver_channelsonline' then
+    else if AName = 'virtualserver_channelsonline' then
       ReadValue(Value, Channels)
-    else if Name = 'virtualserver_created' then
+    else if AName = 'virtualserver_created' then
       ReadValue(Value, CreationDate)
-    else if Name = 'virtualserver_uptime' then
+    else if AName = 'virtualserver_uptime' then
       ReadValue(Value, Uptime)
-    else if Name = 'virtualserver_codec_encryption_mode' then
+    else if AName = 'virtualserver_codec_encryption_mode' then
       ReadValue(Value, CodecEncryptionMode)
-    else if Name = 'virtualserver_hostmessage' then
+    else if AName = 'virtualserver_hostmessage' then
       ReadValue(Value, HostMessage)
-    else if Name = 'virtualserver_hostmessage_mode' then
+    else if AName = 'virtualserver_hostmessage_mode' then
       ReadValue(Value, MessageMode)
-    else if Name = 'virtualserver_filebase' then
+    else if AName = 'virtualserver_filebase' then
       ReadValue(Value, FileBase)
-    else if Name = 'virtualserver_default_server_group' then
+    else if AName = 'virtualserver_default_server_group' then
       ReadValue(Value, DefaultSGroup)
-    else if Name = 'virtualserver_default_channel_group' then
+    else if AName = 'virtualserver_default_channel_group' then
       ReadValue(Value, DefaultCGroup)
-    else if Name = 'virtualserver_flag_password' then
+    else if AName = 'virtualserver_flag_password' then
       ReadValue(Value, HasPassword)
-    else if Name = 'virtualserver_default_channel_admin_group' then
+    else if AName = 'virtualserver_default_channel_admin_group' then
       ReadValue(Value, DefaultCAGroup)
-    else if Name = 'virtualserver_max_download_total_bandwidth' then
+    else if AName = 'virtualserver_max_download_total_bandwidth' then
       ReadValue(Value, MaxDLBandwidth)
-    else if Name = 'virtualserver_max_upload_total_bandwidth' then
+    else if AName = 'virtualserver_max_upload_total_bandwidth' then
       ReadValue(Value, MaxULBandwith)
-    else if Name = 'virtualserver_hostbanner_url' then
+    else if AName = 'virtualserver_hostbanner_url' then
       ReadValue(Value, BannerURL)
-    else if Name = 'virtualserver_hostbanner_gfx_url' then
+    else if AName = 'virtualserver_hostbanner_gfx_url' then
       ReadValue(Value, BannerImage)
-    else if Name = 'virtualserver_hostbanner_gfx_interval' then
+    else if AName = 'virtualserver_hostbanner_gfx_interval' then
       ReadValue(Value, BannerUpdateInterval)
-    else if Name = 'virtualserver_complain_autoban_count' then
+    else if AName = 'virtualserver_complain_autoban_count' then
       ReadValue(Value, ComplainBanCount)
-    else if Name = 'virtualserver_complain_autoban_time' then
+    else if AName = 'virtualserver_complain_autoban_time' then
       ReadValue(Value, ComplainBanTime)
-    else if Name = 'virtualserver_complain_remove_time' then
+    else if AName = 'virtualserver_complain_remove_time' then
       ReadValue(Value, ComplainRemoveTime)
-    else if Name = 'virtualserver_min_clients_in_channel_before_forced_silence' then
+    else if AName = 'virtualserver_min_clients_in_channel_before_forced_silence' then
       ReadValue(Value, MinClientsForcedSilence)
-    else if Name = 'virtualserver_priority_speaker_dimm_modificator' then
+    else if AName = 'virtualserver_priority_speaker_dimm_modificator' then
       ReadValue(Value, PriorityDim)
-    else if Name = 'virtualserver_id' then
+    else if AName = 'virtualserver_id' then
       ReadValue(Value, ID)
-    else if Name = 'virtualserver_antiflood_points_tick_reduce' then
+    else if AName = 'virtualserver_antiflood_points_tick_reduce' then
       ReadValue(Value, AFTickReduce)
-    else if Name = 'virtualserver_antiflood_points_needed_command_block' then
+    else if AName = 'virtualserver_antiflood_points_needed_command_block' then
       ReadValue(Value, AFBlockCount)
-    else if Name = 'virtualserver_antiflood_points_needed_ip_block' then
+    else if AName = 'virtualserver_antiflood_points_needed_ip_block' then
       ReadValue(Value, AFIPBlockCount)
-    else if Name = 'virtualserver_client_connections' then
+    else if AName = 'virtualserver_client_connections' then
       ReadValue(Value, Clients)
-    else if Name = 'virtualserver_query_client_connections' then
+    else if AName = 'virtualserver_query_client_connections' then
       ReadValue(Value, QueryConnections)
-    else if Name = 'virtualserver_hostbutton_tooltip' then
+    else if AName = 'virtualserver_hostbutton_tooltip' then
       ReadValue(Value, HostButtonTooltip)
-    else if Name = 'virtualserver_hostbutton_url' then
+    else if AName = 'virtualserver_hostbutton_url' then
       ReadValue(Value, HostButtonUrl)
-    else if Name = 'virtualserver_hostbutton_gfx_url' then
+    else if AName = 'virtualserver_hostbutton_gfx_url' then
       ReadValue(Value, HostButtonImage)
-    else if Name = 'virtualserver_queryclientsonline' then
+    else if AName = 'virtualserver_queryclientsonline' then
       ReadValue(Value, QueryClients)
-    else if Name = 'virtualserver_download_quota' then
+    else if AName = 'virtualserver_download_quota' then
       ReadValue(Value, DLQuota)
-    else if Name = 'virtualserver_upload_quota' then
+    else if AName = 'virtualserver_upload_quota' then
       ReadValue(Value, ULQuota)
-    else if Name = 'virtualserver_month_bytes_downloaded' then
+    else if AName = 'virtualserver_month_bytes_downloaded' then
       ReadValue(Value, BytesDLMonth)
-    else if Name = 'virtualserver_month_bytes_uploaded' then
+    else if AName = 'virtualserver_month_bytes_uploaded' then
       ReadValue(Value, BytesULMonth)
-    else if Name = 'virtualserver_total_bytes_downloaded' then
+    else if AName = 'virtualserver_total_bytes_downloaded' then
       ReadValue(Value, BytesDLTotal)
-    else if Name = 'virtualserver_total_bytes_uploaded' then
+    else if AName = 'virtualserver_total_bytes_uploaded' then
       ReadValue(Value, BytesULTotal)
-    else if Name = 'virtualserver_port' then
+    else if AName = 'virtualserver_port' then
       ReadValue(Value, Port)
-    else if Name = 'virtualserver_autostart' then
+    else if AName = 'virtualserver_autostart' then
       ReadValue(Value, Autostart)
-    else if Name = 'virtualserver_machine_id' then
+    else if AName = 'virtualserver_machine_id' then
       ReadValue(Value, MachineID)
-    else if Name = 'virtualserver_needed_identity_security_level' then
+    else if AName = 'virtualserver_needed_identity_security_level' then
       ReadValue(Value, SecurityLevelRequired)
-    else if Name = 'virtualserver_log_client' then
+    else if AName = 'virtualserver_log_client' then
       ReadValue(Value, LogClients)
-    else if Name = 'virtualserver_log_query' then
+    else if AName = 'virtualserver_log_query' then
       ReadValue(Value, LogQuerys)
-    else if Name = 'virtualserver_log_channel' then
+    else if AName = 'virtualserver_log_channel' then
       ReadValue(Value, LogChannels)
-    else if Name = 'virtualserver_log_permissions' then
+    else if AName = 'virtualserver_log_permissions' then
       ReadValue(Value, LogPermissions)
-    else if Name = 'virtualserver_log_server' then
+    else if AName = 'virtualserver_log_server' then
       ReadValue(Value, LogServer)
-    else if Name = 'virtualserver_log_filetransfer' then
+    else if AName = 'virtualserver_log_filetransfer' then
       ReadValue(Value, LogFileTransfers)
-    else if Name = 'virtualserver_min_client_version' then
+    else if AName = 'virtualserver_min_client_version' then
       ReadValue(Value, MinClientVersion)
-    else if Name = 'virtualserver_name_phonetic' then
+    else if AName = 'virtualserver_name_phonetic' then
       ReadValue(Value, PhoneticName)
-    else if Name = 'virtualserver_icon_id' then
+    else if AName = 'virtualserver_icon_id' then
       ReadValue(Value, IconID)
-    else if Name = 'virtualserver_reserved_slots' then
+    else if AName = 'virtualserver_reserved_slots' then
       ReadValue(Value, ReservedSlots)
-    else if Name = 'virtualserver_total_packetloss_speech' then
+    else if AName = 'virtualserver_total_packetloss_speech' then
       ReadValue(Value, PacketLossSpeech)
-    else if Name = 'virtualserver_total_packetloss_keepalive' then
+    else if AName = 'virtualserver_total_packetloss_keepalive' then
       ReadValue(Value, PacketLossKeepalive)
-    else if Name = 'virtualserver_total_packetloss_control' then
+    else if AName = 'virtualserver_total_packetloss_control' then
       ReadValue(Value, PacketLossControl)
-    else if Name = 'virtualserver_total_packetloss_total' then
+    else if AName = 'virtualserver_total_packetloss_total' then
       ReadValue(Value, PacketLossTotal)
-    else if Name = 'virtualserver_total_ping' then
+    else if AName = 'virtualserver_total_ping' then
       ReadValue(Value, Ping)
-    else if Name = 'virtualserver_ip' then
+    else if AName = 'virtualserver_ip' then
       ReadValue(Value, IP)
-    else if Name = 'virtualserver_weblist_enabled' then
+    else if AName = 'virtualserver_weblist_enabled' then
       ReadValue(Value, WebList)
-    else if Name = 'virtualserver_ask_for_privilegekey' then
+    else if AName = 'virtualserver_ask_for_privilegekey' then
       ReadValue(Value, PriviledgeKeyUnused)
-    else if Name = 'virtualserver_hostbanner_mode' then
+    else if AName = 'virtualserver_hostbanner_mode' then
       ReadValue(Value, BannerMode)
-    else if Name = 'virtualserver_channel_temp_delete_delay_default' then
+    else if AName = 'virtualserver_channel_temp_delete_delay_default' then
       ReadValue(Value, DefaultTempChannelDeletionTime)
-    else if Name = 'virtualserver_min_android_version' then
+    else if AName = 'virtualserver_min_android_version' then
       ReadValue(Value, MinAndroidVersion)
-    else if Name = 'virtualserver_min_ios_version' then
+    else if AName = 'virtualserver_min_ios_version' then
       ReadValue(Value, MinIOSVersion)
-    else if Name = 'virtualserver_status' then
+    else if AName = 'virtualserver_status' then
       ReadValue(Value, Status);
 end;
 
@@ -505,6 +525,8 @@ var
   sl: TStringList;
   i: Integer;
 begin
+  Finalize(Connection);
+  FillByte(Connection, SizeOf(Connection), 0);
   sl := TStringList.Create;
   try
     sl.Delimiter := ' ';
@@ -520,56 +542,56 @@ begin
   end;
 end;
 
-procedure SetConnectionData(Name: String; Value: String; var Connection: TConnectionData);
+procedure SetConnectionData(AName: String; Value: String; var Connection: TConnectionData);
 begin
   with Connection do
-    if Name = 'connection_filetransfer_bandwidth_sent' then
+    if AName = 'connection_filetransfer_bandwidth_sent' then
       ReadValue(Value, FileBandwidthOut)
-    else if Name = 'connection_filetransfer_bandwidth_received' then
+    else if AName = 'connection_filetransfer_bandwidth_received' then
       ReadValue(Value, FileBandwidthIn)
-    else if Name = 'connection_filetransfer_bytes_sent_total' then
+    else if AName = 'connection_filetransfer_bytes_sent_total' then
       ReadValue(Value, BytesOut)
-    else if Name = 'connection_filetransfer_bytes_received_total' then
+    else if AName = 'connection_filetransfer_bytes_received_total' then
       ReadValue(Value, BytesIn)
-    else if Name = 'connection_packets_sent_speech' then
+    else if AName = 'connection_packets_sent_speech' then
       ReadValue(Value, PacketsOutSpeech)
-    else if Name = 'connection_bytes_sent_speech' then
+    else if AName = 'connection_bytes_sent_speech' then
       ReadValue(Value, BytesOutSpeech)
-    else if Name = 'connection_packets_received_speech' then
+    else if AName = 'connection_packets_received_speech' then
       ReadValue(Value, PacketsInSpeech)
-    else if Name = 'connection_bytes_received_speech' then
+    else if AName = 'connection_bytes_received_speech' then
       ReadValue(Value, BytesInSpeech)
-    else if Name = 'connection_packets_sent_keepalive' then
+    else if AName = 'connection_packets_sent_keepalive' then
       ReadValue(Value, PacketsOutKeepAlive)
-    else if Name = 'connection_bytes_sent_keepalive' then
+    else if AName = 'connection_bytes_sent_keepalive' then
       ReadValue(Value, BytesOutKeepAlive)
-    else if Name = 'connection_packets_received_keepalive' then
+    else if AName = 'connection_packets_received_keepalive' then
       ReadValue(Value, PacketsInKeepAlive)
-    else if Name = 'connection_bytes_received_keepalive' then
+    else if AName = 'connection_bytes_received_keepalive' then
       ReadValue(Value, BytesInKeepAlive)
-    else if Name = 'connection_packets_sent_control' then
+    else if AName = 'connection_packets_sent_control' then
       ReadValue(Value, PacketsOutControl)
-    else if Name = 'connection_bytes_sent_control' then
+    else if AName = 'connection_bytes_sent_control' then
       ReadValue(Value, PacketsInControl)
-    else if Name = 'connection_packets_received_control' then
+    else if AName = 'connection_packets_received_control' then
       ReadValue(Value, FileBandwidthOut)
-    else if Name = 'connection_bytes_received_control' then
+    else if AName = 'connection_bytes_received_control' then
       ReadValue(Value, BytesInControl)
-    else if Name = 'connection_packets_sent_total' then
+    else if AName = 'connection_packets_sent_total' then
       ReadValue(Value, PacketsOut)
-    else if Name = 'connection_bytes_sent_total' then
+    else if AName = 'connection_bytes_sent_total' then
       ReadValue(Value, BytesOut)
-    else if Name = 'connection_packets_received_total' then
+    else if AName = 'connection_packets_received_total' then
       ReadValue(Value, PacketsIn)
-    else if Name = 'connection_bytes_received_total' then
+    else if AName = 'connection_bytes_received_total' then
       ReadValue(Value, BytesIn)
-    else if Name = 'connection_bandwidth_sent_last_second_total' then
+    else if AName = 'connection_bandwidth_sent_last_second_total' then
       ReadValue(Value, BandwidthSecOut)
-    else if Name = 'connection_bandwidth_sent_last_minute_total' then
+    else if AName = 'connection_bandwidth_sent_last_minute_total' then
       ReadValue(Value, BandwidthMinOut)
-    else if Name = 'connection_bandwidth_received_last_second_total' then
+    else if AName = 'connection_bandwidth_received_last_second_total' then
       ReadValue(Value, BandwidthSecIn)
-    else if Name = 'connection_bandwidth_received_last_minute_total' then
+    else if AName = 'connection_bandwidth_received_last_minute_total' then
       ReadValue(Value, BandwidthMinIn);
 end;
 
@@ -578,6 +600,8 @@ var
   sl: TStringList;
   i: Integer;
 begin
+  Finalize(Channel);
+  FillByte(Channel, SizeOf(Channel), 0);
   sl := TStringList.Create;
   try
     sl.Delimiter := ' ';
@@ -593,12 +617,73 @@ begin
   end;
 end;
 
-procedure SetChannelData(Name: String; Value: String; var Channel: TChannelData);
+procedure SetChannelData(AName: String; Value: String; var Channel: TChannelData);
 begin
   with Channel do
-    if Name = 'cid' then
+    if AName = 'cid' then
       ReadValue(Value, ID)
-      { TODO : Finish }
+    else if AName = 'pid' then
+      ReadValue(Value, ParentID)
+    else if AName = 'channel_name' then
+      ReadValue(Value, Name)
+    else if AName = 'channel_topic' then
+      ReadValue(Value, Topic)
+    else if AName = 'channel_description' then
+      ReadValue(Value, Description)
+    else if AName = 'channel_password' then
+      ReadValue(Value, Password)
+    else if AName = 'channel_codec' then
+      ReadValue(Value, Codec)
+    else if AName = 'channel_codec_quality' then
+      ReadValue(Value, CodecQuality)
+    else if AName = 'channel_maxclients' then
+      ReadValue(Value, MaxClients)
+    else if AName = 'channel_maxfamilyclients' then
+      ReadValue(Value, MaxClientsFamily)
+    else if AName = 'channel_order' then
+      ReadValue(Value, Order)
+    else if AName = 'channel_flag_permanent' then
+      ReadValue(Value, IsPermament)
+    else if AName = 'channel_flag_semi_permanent' then
+      ReadValue(Value, IsSemipermament)
+    else if AName = 'channel_flag_default' then
+      ReadValue(Value, IsDefault)
+    else if AName = 'channel_flag_password' then
+      ReadValue(Value, HasPassword)
+    else if AName = 'channel_codec_latency_factor' then
+      ReadValue(Value, CodecQuality)
+    else if AName = 'channel_codec_is_unencrypted' then
+      ReadValue(Value, Unencrypted)
+    else if AName = 'channel_security_salt' then
+      ReadValue(Value, PasswordSalt)
+    else if AName = 'channel_delete_delay' then
+      ReadValue(Value, DeleteDelay)
+    else if AName = 'channel_flag_maxclients_unlimited' then
+      ReadValue(Value, IsUnlimited)
+    else if AName = 'channel_flag_maxfamilyclients_unlimited' then
+      ReadValue(Value, IsFamilyUnlimited)
+    else if AName = 'channel_flag_maxfamilyclients_inherited' then
+      ReadValue(Value, IsMaxClientsInherited)
+    else if AName = 'channel_filepath' then
+      ReadValue(Value, FilePath)
+    else if AName = 'channel_needed_talk_power' then
+      ReadValue(Value, Talkpower)
+    else if AName = 'channel_forced_silence' then
+      ReadValue(Value, IsSilenced)
+    else if AName = 'channel_name_phonetic' then
+      ReadValue(Value, PhoneticName)
+    else if AName = 'channel_icon_id' then
+      ReadValue(Value, IconID)
+    else if AName = 'channel_flag_private' then
+      ReadValue(Value, IsPrivate)
+    else if AName = 'seconds_empty' then
+      ReadValue(Value, SecondsEmpty)
+    else if AName = 'total_clients_family' then
+      ReadValue(Value, FamilyClients)
+    else if AName = 'total_clients' then
+      ReadValue(Value, Clients)
+    else if AName = 'channel_needed_subscribe_power' then
+      ReadValue(Value, SubscribePower);
 end;
 
 function GetNotificationType(Str: string): TNotificationType;

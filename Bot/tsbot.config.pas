@@ -15,12 +15,17 @@ type
     Port: integer;
     ServerID: integer;
     LogPath: string;
+    UpdateServerData: Integer;
+    UpdateChannelList: Integer;
+    UpdateClientList: Integer;
   end;
 
 const
   DefaultConf: TConfig = (Username: 'User'; Password: 'Pass';
     IPAddress: '127.0.0.1'; Port: 10011; ServerID: 1;
-    LogPath: {$IfDef DEBUG}'./log.txt'{$Else}''{$EndIf});
+    LogPath: {$IfDef DEBUG}'./log.txt'{$Else}''{$EndIf};
+    UpdateServerData: -1; UpdateChannelList: 10000;
+    UpdateClientList: 1000);
   ConfigVersion = 1;
 
 function ReadConfig(Path: string): TConfig;
@@ -31,6 +36,20 @@ implementation
 uses DOM, XMLRead, XMLWrite;
 
 function ReadConfig(Path: string): TConfig;
+
+
+function IsNumeric(Str: String): Boolean;
+var
+  c: Char;
+begin
+  Result:=Length(Str)>0;
+  for c in str do
+    if not (c in ['0'..'9']) then
+    begin
+      Result:=False;
+      Break;
+    end;
+end;
 
   procedure ReadLoginData(Doc: TXMLDocument);
   var
@@ -70,6 +89,29 @@ function ReadConfig(Path: string): TConfig;
       Result.Username := attr;
   end;
 
+  procedure ReadUpdateInterval(Doc: TXMLDocument);
+  var
+    Node: TDOMElement;
+    attr: string;
+  begin
+    Node := Doc.DocumentElement.FindNode('UpdateInterval') as TDOMElement;
+
+    if not Assigned(Node) then
+      Exit;
+
+    attr := Node.AttribStrings['ServerData'];
+    if IsNumeric(attr) then
+      Result.UpdateServerData := StrToInt(attr);
+
+    attr := Node.AttribStrings['Channels'];
+    if IsNumeric(attr)then
+      Result.UpdateChannelList := StrToInt(attr);
+
+    attr := Node.AttribStrings['Clients'];
+    if IsNumeric(attr) then
+      Result.UpdateClientList := StrToInt(attr);
+  end;
+
 var
   doc: TXMLDocument;
 begin
@@ -79,6 +121,7 @@ begin
   ReadXMLFile(doc, Path);
   try
     ReadLoginData(doc);
+    ReadUpdateInterval(doc);
   finally
     doc.Free;
   end;
@@ -112,6 +155,15 @@ begin
     // Adding Userdata Attributes
     TDOMElement(DataNode).SetAttribute('User', Config.Username);
     TDOMElement(DataNode).SetAttribute('Pass', Config.Password);
+
+    // Adding Update Interval info
+    ParentNode:=doc.CreateElement('UpdateInterval');
+    RootNode.AppendChild(ParentNode);
+
+    // Adding update intervalls
+    TDOMElement(ParentNode).SetAttribute('ServerData', IntToStr(Config.UpdateServerData));
+    TDOMElement(ParentNode).SetAttribute('Channels', IntToStr(Config.UpdateChannelList));
+    TDOMElement(ParentNode).SetAttribute('Clients', IntToStr(Config.UpdateClientList));
 
     WriteXMLFile(doc, Path);
   finally

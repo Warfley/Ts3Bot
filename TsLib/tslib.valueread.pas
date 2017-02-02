@@ -20,6 +20,7 @@ procedure ReadValue(Val: String; out Result: TDateTime);
 procedure ReadValue(Val: String; out Result: TCodecEncryptionMode);
 procedure ReadValue(Val: String; out Result: TMessageMode);
 procedure ReadValue(Val: String; out Result: TBannerMode);
+procedure ReadValue(Val: String; out Result: TCodec);
 
 function IsNumeric(str: String): Boolean;
 
@@ -165,6 +166,14 @@ var
 begin
   ReadValue(val, i);
   Result:=TBannerMode(i);
+end;
+
+procedure ReadValue(Val: String; out Result: TCodec);
+var
+  i: Integer;
+begin
+  ReadValue(val, i);
+  Result:=TCodec(i);
 end;
 
 function IsNumeric(Str: String): Boolean;

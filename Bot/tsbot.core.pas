@@ -6,11 +6,19 @@ interface
 
 uses
   Classes, SysUtils, TsBot.Config, Logger, TsLib.Types, TsLib.Connection,
-  TsLib.NotificationManager, TsBotUI.Types, syncobjs, TsLib.Server;
+  TsLib.NotificationManager, TsBotUI.Types, syncobjs, TsLib.Server, gvector;
 
 type
 
   { TTBCore }
+
+  TScheduleInfo = record
+    Time: Integer;
+    Remaining: Integer;
+    Code: TNotifyEvent;
+  end;
+
+  TSchedules = specialize TVector<TScheduleInfo>;
 
   TTBCore = class(TThread)
   private
@@ -21,12 +29,15 @@ type
     FNotificationManager: TNotificationManager;
     DoRestart: boolean;
     FAutoRestart: boolean;
-    CommandCS, ConfigCS: TRTLCriticalSection;
+    CommandCS, ConfigCS, ScheduleCS: TRTLCriticalSection;
     FIdleToTerminate: boolean;
+    FSchedules: TSchedules;
+    FServer: TTsServer;
     function GetConfig: TConfig;
     procedure SetAutoRestart(AValue: boolean);
     procedure SleepAndCheck(Time: integer; Step: integer = 100);
     procedure RunCommands;
+    procedure RunSchedules(Time: QWord);
     { Private declarations }
   protected
     { Protected declarations }
@@ -34,7 +45,13 @@ type
     procedure CleanUp;
     procedure Run;
     procedure Execute; override;
+    procedure UpdateChannels(Sender: TObject);
+    procedure UpdateClients(Sender: TObject);
+    procedure UpdateServer(Sender: TObject);
   public
+    procedure ClearSchedules;
+    procedure RegisterSchedule(Time: Integer; Code: TNotifyEvent);
+    procedure RemoveSchedule(Code: TNotifyEvent);
     procedure Restart;
     procedure RegisterCommand(C: TCommandEventData);
     constructor Create(AOnTerminate: TNotifyEvent; ConfPath: string;
@@ -75,20 +92,21 @@ begin
   // Check if currently accessed, if so wait till it is free
   EnterCriticalsection(ConfigCS);
   try
-    Result:=FConfig;
+    Result := FConfig;
   finally
     LeaveCriticalsection(ConfigCS);
   end;
 end;
 
 procedure TTBCore.RunCommands;
-function ifThen(Cond: Boolean; const TStr, FStr: String): String;
-begin
-  if Cond then
-    Result:=TStr
-  else
-    Result:=FStr;
-end;
+
+  function ifThen(Cond: boolean; const TStr, FStr: string): string;
+  begin
+    if Cond then
+      Result := TStr
+    else
+      Result := FStr;
+  end;
 
 var
   c: TCommandEventData;
@@ -151,9 +169,11 @@ begin
               Add(Format('Server ID: %d', [FConfig.ServerID]));
               Add(Format('Username: %s', [FConfig.Username]));
               Add(Format('Password: %s', [FConfig.Password]));
-              Add(Format('Status: %s', [ifThen(Assigned(FConnection) And FConnection.Connected,'Connected', 'Not Connected')]));
+              Add(Format('Status: %s',
+                [ifThen(Assigned(FConnection) and FConnection.Connected, 'Connected',
+                'Not Connected')]));
             end;
-            s:=True
+            s := True
           finally
             LeaveCriticalsection(ConfigCS);
           end;
@@ -163,7 +183,7 @@ begin
           EnterCriticalsection(ConfigCS);
           try
             TStringList(c.Data).Add(FConfig.LogPath);
-            s:=True
+            s := True
           finally
             LeaveCriticalsection(ConfigCS);
           end;
@@ -172,7 +192,7 @@ begin
           try
             EnterCriticalsection(ConfigCS);
             FConfig.LogPath := PString(c.Data)^;
-            WriteHint('Changed Logpath to file: '+FConfig.LogPath);
+            WriteHint('Changed Logpath to file: ' + FConfig.LogPath);
             DestroyFileLogger;
             CreateFileLogger(FConfig.LogPath);
             s := True;
@@ -181,14 +201,14 @@ begin
             Dispose(PString(c.Data));
           end;
         ctResetConfig:
-        try
-          EnterCriticalsection(ConfigCS);
-          FConfig:=ReadConfig('');
-          Restart;
-          s:=True;
-        finally
-          LeaveCriticalsection(ConfigCS);
-        end;
+          try
+            EnterCriticalsection(ConfigCS);
+            FConfig := ReadConfig('');
+            Restart;
+            s := True;
+          finally
+            LeaveCriticalsection(ConfigCS);
+          end;
       end;
       if Assigned(c.OnFinished) then
         c.OnFinished(Self, c.CommandType, s);
@@ -199,6 +219,29 @@ begin
   end;
 end;
 
+procedure TTBCore.RunSchedules(Time: QWord);
+var
+  s: TScheduleInfo;
+  i: Integer;
+begin
+  EnterCriticalsection(ScheduleCS);
+  try
+    for i:=0 to FSchedules.Size -1 do
+    begin
+      s:=FSchedules[i];
+      s.Remaining := s.Remaining - Time;
+      if s.Remaining<=0 then
+      begin
+        if Assigned(s.Code) then
+          s.Code(Self);
+        s.Remaining:=s.Time;
+      end;
+    end;
+  finally
+    LeaveCriticalsection(ScheduleCS);
+  end;
+end;
+
 function TTBCore.SetUp: boolean;
 begin
   EnterCriticalsection(ConfigCS);
@@ -206,8 +249,8 @@ begin
     DoRestart := False;
     FConnection := TTsConnection.Create(FConfig.IPAddress, FConfig.Port);
     with FConnection do
-      Result := (Connect() and LogIn(FConfig.Username,
-        FConfig.Password) and SwitchServer(FConfig.ServerID));
+      Result := (Connect() and LogIn(FConfig.Username, FConfig.Password) and
+        SwitchServer(FConfig.ServerID));
     if Result then
       FNotificationManager := TNotificationManager.Create(FConnection);
   finally
@@ -228,19 +271,40 @@ end;
 
 procedure TTBCore.Run;
 var
-  FServer: TTsServer;
+  LastTick, Diff: QWord;
 begin
-  FServer:=TTsServer.Create(FConnection, FNotificationManager);
+  FServer := TTsServer.Create(FConnection, FNotificationManager);
   try
     WriteStatus('Requesting serverdata');
     FServer.UpdateServerData;
+    WriteStatus('Requesting channellist');
+    FServer.UpdateChannelList(FullChannelUpdate);
+    // Adding schedules
+    if Config.UpdateServerData >= 0 then
+      RegisterSchedule(Config.UpdateServerData, @UpdateServer);
+    if Config.UpdateChannelList >= 0 then
+      RegisterSchedule(Config.UpdateChannelList, @UpdateChannels);
+    if Config.UpdateClientList >= 0 then
+      RegisterSchedule(Config.UpdateClientList, @UpdateClients);
+
+    // Set up notifications
+    FServer.UseNotifications := True;
+    FNotificationManager.Active := True;
+
+    LastTick := GetTickCount64;
 
     while not (Terminated or DoRestart) do
     begin
-      Sleep(100);
+      // TimeDifference
+      Diff := GetTickCount64 - LastTick;
+      LastTick := GetTickCount64;
+
+      // Check schedules
+      RunSchedules(Diff);
+      FNotificationManager.SendNotifications;
       RunCommands;
+      Sleep(100);
     end;
-    { TODO : Implement Something here }
   finally
     FServer.Free;
   end;
@@ -275,7 +339,7 @@ begin
               begin
                 WriteError(-1, e.Message);
                 WriteStatus('Restarting...');
-                DoRestart:=True;
+                DoRestart := True;
               end;
             end;
           end
@@ -302,6 +366,66 @@ begin
     finally
       LeaveCriticalsection(ConfigCS);
     end;
+  end;
+end;
+
+procedure TTBCore.UpdateChannels(Sender: TObject);
+begin
+  FServer.UpdateChannelList;
+end;
+
+procedure TTBCore.UpdateClients(Sender: TObject);
+begin
+  FServer.UpdateClientList;
+end;
+
+procedure TTBCore.UpdateServer(Sender: TObject);
+begin
+  FServer.UpdateServerData;
+end;
+
+procedure TTBCore.ClearSchedules;
+begin
+  EnterCriticalsection(ScheduleCS);
+  try
+    FSchedules.Clear;
+  finally
+    LeaveCriticalsection(ScheduleCS);
+  end;
+end;
+
+procedure TTBCore.RegisterSchedule(Time: Integer; Code: TNotifyEvent);
+var s: TScheduleInfo;
+begin
+  EnterCriticalsection(ScheduleCS);
+  try
+    s.Code:=Code;
+    s.Time:=Time;
+    s.Remaining:=Time;
+    FSchedules.PushBack(s);
+  finally
+    LeaveCriticalsection(ScheduleCS);
+  end;
+end;
+
+procedure TTBCore.RemoveSchedule(Code: TNotifyEvent);
+var
+  i: Integer;
+  s: TScheduleInfo;
+begin
+  EnterCriticalsection(ScheduleCS);
+  try
+    for i:=0 to FSchedules.Size-1 do
+    begin
+      s:=FSchedules[i];
+      if s.Code = Code then
+      begin
+        FSchedules.Erase(i);
+        break;
+      end;
+    end;
+  finally
+    LeaveCriticalsection(ScheduleCS);
   end;
 end;
 
@@ -334,10 +458,11 @@ begin
   OnTerminate := AOnTerminate;
   InitCriticalSection(CommandCS);
   InitCriticalSection(ConfigCS);
+  InitCriticalSection(ScheduleCS);
   DoRestart := True;
   FCommandList := TCommandList.Create;
   FIdleToTerminate := AIdleToTerminate;
-
+  FSchedules:=TSchedules.Create;
   inherited Create(False);
 end;
 
@@ -347,6 +472,8 @@ begin
   DestroyFileLogger;
   DoneCriticalsection(CommandCS);
   DoneCriticalsection(ConfigCS);
+  DoneCriticalsection(ScheduleCS);
+  FSchedules.Free;
   FCommandList.Free;
   inherited Destroy;
 end;

@@ -47,8 +47,5 @@ begin
   cli.Terminate;
   cli.WaitFor;
   DestroyDebugLogger;
-  {$If defined(DEBUG) AND defined(Windows)}
-  ReadLn;
-  {$EndIf}
 end.
 
