@@ -20,6 +20,12 @@ type
 
   { TTsConnection }
 
+  TAntiFloodData = record
+    UseAntiFlood: Boolean;
+    TickReduce: Integer;
+    Count, Ban, CommandBan: Integer;
+  end;
+
   TTsConnection = class
   private
     FRecieverThread: TThread;
@@ -36,6 +42,8 @@ type
     FServerID: integer;
     FSyncData, FSyncRecievers: TRTLCriticalSection;
     FIncomeData: string;
+    FAntiFloodShit: QWord;
+    FAntiFloodData: TAntiFloodData;
     function RecieveStatus(Sender: TObject; Data: string;
       var RemoveFromList: boolean): boolean;
     function getConnected: boolean;
@@ -47,6 +55,7 @@ type
     procedure TelnetDataAvailable(Sender: TIdTelnet; const Buffer: TIdBytes);
     procedure TelnetDisconnected(Sender: TObject);
   public
+    procedure FloodControl(Reduce, Ban, Command: Integer);
     constructor Create(Host: string; Port: integer);
     destructor Destroy; override;
     function Connect: boolean;
@@ -224,6 +233,16 @@ begin
     FOnDisconnected(Self);
 end;
 
+procedure TTsConnection.FloodControl(Reduce, Ban, Command: Integer);
+begin
+    FAntiFloodData.UseAntiFlood:= (Reduce = -1) and (Ban=-1) and (Command =-1);
+    FAntiFloodData.Ban:=Ban;
+    FAntiFloodData.Count:=60;
+    FAntiFloodData.TickReduce:=Reduce;
+    FAntiFloodData.CommandBan:=Command;
+    FAntiFloodShit:=GetTickCount64;
+end;
+
 constructor TTsConnection.Create(Host: string; Port: integer);
 begin
   FRecieverThread := TThread.CurrentThread;
@@ -285,7 +304,21 @@ begin
 end;
 
 procedure TTsConnection.Disconnect;
+var diff: QWord;
 begin
+  if FAntiFloodData.UseAntiFlood then
+  begin
+    Diff:=(GetTickCount64-FAntiFloodShit) div 500;
+    FAntiFloodShit:=GetTickCount64;
+    if diff*FAntiFloodData.TickReduce >FAntiFloodData.Count then
+      FAntiFloodData.Count:=0
+    else
+      FAntiFloodData.Count-=Diff*FAntiFloodData.TickReduce;
+
+    if FAntiFloodData.Count>FAntiFloodData.CommandBan-50 then
+        sleep((FAntiFloodData.Count-FAntiFloodData.CommandBan-50)*500 div FAntiFloodData.TickReduce);
+    FAntiFloodData.Count += 50;
+  end;
   // exit if no active connection
   if not Connected then
     exit;
@@ -338,7 +371,22 @@ end;
 function TTsConnection.ExecCommand(Cmd: string): TStatusResponse;
 var
   i: integer;
+  Diff: QWord;
 begin
+  if FAntiFloodData.UseAntiFlood then
+  begin
+    Diff:=(GetTickCount64-FAntiFloodShit) div 500;
+    FAntiFloodShit:=GetTickCount64;
+    if diff*FAntiFloodData.TickReduce >FAntiFloodData.Count then
+      FAntiFloodData.Count:=0
+    else
+      FAntiFloodData.Count-=Diff*FAntiFloodData.TickReduce;
+
+    if FAntiFloodData.Count>FAntiFloodData.CommandBan-50 then
+        sleep((FAntiFloodData.Count-FAntiFloodData.CommandBan-50)*500 div FAntiFloodData.TickReduce);
+    FAntiFloodData.Count += 50;
+  end;
+
   FLastMessage:='';
   while FWaitingForStatus do //Someone waiting for another command
     Sleep(100);

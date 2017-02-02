@@ -149,7 +149,7 @@ begin
   str := '';
   c := #0;
   currPos := 1;
-  while (c <> #13) and not Terminated do
+  while not (c in [#13, #10]) and not Terminated do
   begin
     c := ReadChar(False);
     case c of
@@ -184,16 +184,10 @@ begin
       end;
     {$IFDEF Windows}
     #4:
-    {$Else}
-      #37:
-    {$EndIf}
         currPos := max(currPos - 1, 1);
-    {$IFDEF Windows}
     #6:
-    {$Else}
-      #39:
-    {$EndIf}
         currPos := min(currPos + 1, Length(str) + 1);
+    {$EndIf}
     end;
     if c in [
 {$IFDEF Windows} #4, #6 {$Else}

@@ -12,10 +12,13 @@ type
 
   { TTBCore }
 
+  TDataEvent = procedure (Sender: TObject; Data: IntPtr) of object;
+
   TScheduleInfo = record
     Time: Integer;
     Remaining: Integer;
-    Code: TNotifyEvent;
+    Code: TDataEvent;
+    Data: IntPtr;
   end;
 
   TSchedules = specialize TVector<TScheduleInfo>;
@@ -45,13 +48,13 @@ type
     procedure CleanUp;
     procedure Run;
     procedure Execute; override;
-    procedure UpdateChannels(Sender: TObject);
-    procedure UpdateClients(Sender: TObject);
-    procedure UpdateServer(Sender: TObject);
+    procedure UpdateChannels(Sender: TObject; Data: IntPtr);
+    procedure UpdateClients(Sender: TObject; Data: IntPtr);
+    procedure UpdateServer(Sender: TObject; Data: IntPtr);
   public
     procedure ClearSchedules;
-    procedure RegisterSchedule(Time: Integer; Code: TNotifyEvent);
-    procedure RemoveSchedule(Code: TNotifyEvent);
+    procedure RegisterSchedule(Time: Integer; Code: TDataEvent; Data: Integer=0);
+    procedure RemoveSchedule(Code: TDataEvent; Data: Integer=0);
     procedure Restart;
     procedure RegisterCommand(C: TCommandEventData);
     constructor Create(AOnTerminate: TNotifyEvent; ConfPath: string;
@@ -233,7 +236,7 @@ begin
       if s.Remaining<=0 then
       begin
         if Assigned(s.Code) then
-          s.Code(Self);
+          s.Code(Self, s.Data);
         s.Remaining:=s.Time;
       end;
     end;
@@ -248,6 +251,7 @@ begin
   try
     DoRestart := False;
     FConnection := TTsConnection.Create(FConfig.IPAddress, FConfig.Port);
+    FConnection.FloodControl(FConfig.FloodReduce, FConfig.FloodIPBan, FConfig.FloodCommandBan);
     with FConnection do
       Result := (Connect() and LogIn(FConfig.Username, FConfig.Password) and
         SwitchServer(FConfig.ServerID));
@@ -369,17 +373,17 @@ begin
   end;
 end;
 
-procedure TTBCore.UpdateChannels(Sender: TObject);
+procedure TTBCore.UpdateChannels(Sender: TObject; Data: IntPtr);
 begin
   FServer.UpdateChannelList;
 end;
 
-procedure TTBCore.UpdateClients(Sender: TObject);
+procedure TTBCore.UpdateClients(Sender: TObject; Data: IntPtr);
 begin
   FServer.UpdateClientList;
 end;
 
-procedure TTBCore.UpdateServer(Sender: TObject);
+procedure TTBCore.UpdateServer(Sender: TObject; Data: IntPtr);
 begin
   FServer.UpdateServerData;
 end;
@@ -394,7 +398,8 @@ begin
   end;
 end;
 
-procedure TTBCore.RegisterSchedule(Time: Integer; Code: TNotifyEvent);
+procedure TTBCore.RegisterSchedule(Time: Integer; Code: TDataEvent;
+  Data: Integer);
 var s: TScheduleInfo;
 begin
   EnterCriticalsection(ScheduleCS);
@@ -402,13 +407,14 @@ begin
     s.Code:=Code;
     s.Time:=Time;
     s.Remaining:=Time;
+    s.Data:=Data;
     FSchedules.PushBack(s);
   finally
     LeaveCriticalsection(ScheduleCS);
   end;
 end;
 
-procedure TTBCore.RemoveSchedule(Code: TNotifyEvent);
+procedure TTBCore.RemoveSchedule(Code: TDataEvent; Data: Integer);
 var
   i: Integer;
   s: TScheduleInfo;
@@ -418,7 +424,7 @@ begin
     for i:=0 to FSchedules.Size-1 do
     begin
       s:=FSchedules[i];
-      if s.Code = Code then
+      if (s.Code = Code) and (s.Data = Data) then
       begin
         FSchedules.Erase(i);
         break;

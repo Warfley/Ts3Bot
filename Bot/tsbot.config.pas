@@ -18,6 +18,9 @@ type
     UpdateServerData: Integer;
     UpdateChannelList: Integer;
     UpdateClientList: Integer;
+    FloodReduce: Integer;
+    FloodCommandBan: Integer;
+    FloodIPBan: Integer;
   end;
 
 const
@@ -25,7 +28,8 @@ const
     IPAddress: '127.0.0.1'; Port: 10011; ServerID: 1;
     LogPath: {$IfDef DEBUG}'./log.txt'{$Else}''{$EndIf};
     UpdateServerData: -1; UpdateChannelList: 10000;
-    UpdateClientList: 1000);
+    UpdateClientList: 1000; FloodReduce: -1;
+    FloodCommandBan: -1; FloodIPBan: -1);
   ConfigVersion = 1;
 
 function ReadConfig(Path: string): TConfig;
@@ -112,6 +116,29 @@ end;
       Result.UpdateClientList := StrToInt(attr);
   end;
 
+  procedure ReadFloodControl(Doc: TXMLDocument);
+  var
+    Node: TDOMElement;
+    attr: string;
+  begin
+    Node := Doc.DocumentElement.FindNode('AntiFlood') as TDOMElement;
+
+    if not Assigned(Node) then
+      Exit;
+
+    attr := Node.AttribStrings['Reduce'];
+    if IsNumeric(attr) then
+      Result.FloodReduce := StrToInt(attr);
+
+    attr := Node.AttribStrings['CommandBan'];
+    if IsNumeric(attr)then
+      Result.FloodCommandBan := StrToInt(attr);
+
+    attr := Node.AttribStrings['IPBan'];
+    if IsNumeric(attr) then
+      Result.FloodIPBan := StrToInt(attr);
+  end;
+
 var
   doc: TXMLDocument;
 begin
@@ -164,6 +191,15 @@ begin
     TDOMElement(ParentNode).SetAttribute('ServerData', IntToStr(Config.UpdateServerData));
     TDOMElement(ParentNode).SetAttribute('Channels', IntToStr(Config.UpdateChannelList));
     TDOMElement(ParentNode).SetAttribute('Clients', IntToStr(Config.UpdateClientList));
+
+    // Adding FloodControl info
+    ParentNode:=doc.CreateElement('AntiFlood');
+    RootNode.AppendChild(ParentNode);
+
+    // Adding update intervalls
+    TDOMElement(ParentNode).SetAttribute('Reduce', IntToStr(Config.FloodReduce));
+    TDOMElement(ParentNode).SetAttribute('CommandBan', IntToStr(Config.FloodCommandBan));
+    TDOMElement(ParentNode).SetAttribute('IPBan', IntToStr(Config.FloodIPBan));
 
     WriteXMLFile(doc, Path);
   finally
