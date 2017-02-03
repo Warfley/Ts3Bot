@@ -5,12 +5,19 @@ unit TsBot.core;
 interface
 
 uses
-  Classes, SysUtils, TsBot.Config, Logger, TsLib.Types, TsLib.Connection,
-  TsLib.NotificationManager, TsBotUI.Types, syncobjs, TsLib.Server, gvector,
-  fgl, DOM;
+  Classes,
+  SysUtils,
+  Logger,
+  TsBot.Config,
+  TsLib.Types, TsLib.Connection, TsLib.NotificationManager, TsLib.Server,
+  TsBotUI.Types,
+  syncobjs,
+  gvector,
+  fgl,
+  DOM;
 
 type
-  TTBCore = class(TThread);
+  TTBCore = class;
 
   { TTBCore }
 
@@ -53,6 +60,8 @@ type
   TSchedules = specialize TVector<TScheduleInfo>;
   TModuleList = specialize TFPGObjectList<TBotModule>;
 
+  TRegisterModuleEvent = procedure(Sender: TObject; ModuleList: TModuleList) of object;
+
   TTBCore = class(TThread)
   private
     FConfigPath: string;
@@ -67,6 +76,10 @@ type
     FSchedules: TSchedules;
     FServer: TTsServer;
     Modules: TModuleList;
+    FOnRegisterModules: TRegisterModuleEvent;
+    ClientUpdateEvents: TClientUpdateEventList;
+    ServerUpdateEvents: TServerUpdateEventList;
+    ChannelUpdateEvents: TChannelUpdateEventList;
     function GetConfig: TConfig;
     procedure SetAutoRestart(AValue: boolean);
     procedure SleepAndCheck(Time: integer; Step: integer = 100);
@@ -74,6 +87,9 @@ type
     procedure RunSchedules(Time: QWord);
     { Private declarations }
   protected
+    procedure ChannelUpdated(Sender: TObject; Channel: TTsChannel);
+    procedure ClientUpdated(Sender: TObject; Client: TTsClient);
+    procedure ServerUpdated(Sender: TObject);
     { Protected declarations }
     function SetUp: boolean;
     procedure CleanUp;
@@ -90,14 +106,22 @@ type
     procedure Restart;
     procedure RegisterCommand(C: TCommandEventData);
     constructor Create(AOnTerminate: TNotifyEvent; ConfPath: string;
-      AAutoRestart: boolean; AIdleToTerminate: boolean = True);
+      AAutoRestart: boolean; AIdleToTerminate: boolean = True;
+      RegisterModules: TRegisterModuleEvent = nil);
     destructor Destroy; override;
+    procedure RegisterClientUpdateEvent(Event: TClientUpdateEvent);
+    procedure RegisterServerUpdateEvent(Event: TServerUpdateEvent);
+    procedure RegisterChannelUpdateEvent(Event: TChannelUpdateEvent);
+    procedure UnregisterUpdateEvent(Event: TClientUpdateEvent);
+    procedure UnregisterUpdateEvent(Event: TServerUpdateEvent);
+    procedure UnregisterUpdateEvent(Event: TChannelUpdateEvent);
     property Config: TConfig read GetConfig;
     property AutoRestart: boolean read FAutoRestart write SetAutoRestart;
     property IdleToTerminate: boolean read FIdleToTerminate write FIdleToTerminate;
     property Connection: TTsConnection read FConnection;
     property Server: TTsServer read FServer;
     property NotificationManager: TNotificationManager read FNotificationManager;
+    property OnRegisterModules: TRegisterModuleEvent read FOnRegisterModules write FOnRegisterModules;
   end;
 
 implementation
@@ -366,6 +390,30 @@ begin
   end;
 end;
 
+procedure TTBCore.ChannelUpdated(Sender: TObject; Channel: TTsChannel);
+var
+  i: Integer;
+begin
+  for i:=0 to ChannelUpdateEvents.Count-1 do
+    ChannelUpdateEvents[i](Sender, Channel);
+end;
+
+procedure TTBCore.ClientUpdated(Sender: TObject; Client: TTsClient);
+var
+  i: Integer;
+begin
+  for i:=0 to ClientUpdateEvents.Count-1 do
+    ClientUpdateEvents[i](Sender, Client);
+end;
+
+procedure TTBCore.ServerUpdated(Sender: TObject);
+var
+  i: Integer;
+begin
+  for i:=0 to ServerUpdateEvents.Count-1 do
+    ServerUpdateEvents[i](Sender);
+end;
+
 function TTBCore.SetUp: boolean;
 begin
   EnterCriticalsection(ConfigCS);
@@ -406,6 +454,9 @@ begin
     FServer.UpdateChannelList(FullChannelUpdate);
     WriteStatus('Requesting clientlist');
     FServer.UpdateClientList(FullClientUpdate);
+    FServer.OnChannelUpdate:=@ChannelUpdated;
+    FServer.OnClientUpdate:=@ClientUpdated;
+    FServer.OnUpdate:=@ServerUpdated;
 
     // Adding schedules
     if Config.UpdateServerData >= 0 then
@@ -418,6 +469,9 @@ begin
     // Set up notifications
     FServer.UseNotifications := True;
     FNotificationManager.Active := True;
+
+    if Assigned(FOnRegisterModules) then
+      FOnRegisterModules(Self, Modules);
 
     LastTick := GetTickCount64;
 
@@ -593,7 +647,8 @@ begin
 end;
 
 constructor TTBCore.Create(AOnTerminate: TNotifyEvent; ConfPath: string;
-  AAutoRestart: boolean; AIdleToTerminate: boolean);
+  AAutoRestart: boolean; AIdleToTerminate: boolean;
+  RegisterModules: TRegisterModuleEvent);
 begin
   FAutoRestart := AAutoRestart;
   FConfigPath := ConfPath;
@@ -607,6 +662,10 @@ begin
   FIdleToTerminate := AIdleToTerminate;
   FSchedules:=TSchedules.Create;
   Modules:=TModuleList.Create(True);
+  FOnRegisterModules:=RegisterModules;
+  ServerUpdateEvents:=TServerUpdateEventList.Create;
+  ClientUpdateEvents:=TClientUpdateEventList.Create;
+  ChannelUpdateEvents:=TChannelUpdateEventList.Create;
   inherited Create(False);
 end;
 
@@ -620,7 +679,43 @@ begin
   FSchedules.Free;
   FCommandList.Free;
   Modules.Free;
+  ServerUpdateEvents.Free;
+  ClientUpdateEvents.Free;
+  ChannelUpdateEvents.Free;
   inherited Destroy;
+end;
+
+procedure TTBCore.RegisterClientUpdateEvent(Event: TClientUpdateEvent);
+begin
+  if ClientUpdateEvents.IndexOf(Event)<0 then
+    ClientUpdateEvents.Add(Event);
+end;
+
+procedure TTBCore.RegisterServerUpdateEvent(Event: TServerUpdateEvent);
+begin
+  if ServerUpdateEvents.IndexOf(Event)<0 then
+    ServerUpdateEvents.Add(Event);
+end;
+
+procedure TTBCore.RegisterChannelUpdateEvent(Event: TChannelUpdateEvent);
+begin
+  if ChannelUpdateEvents.IndexOf(Event)<0 then
+    ChannelUpdateEvents.Add(Event);
+end;
+
+procedure TTBCore.UnregisterUpdateEvent(Event: TClientUpdateEvent);
+begin
+  ClientUpdateEvents.Remove(Event);
+end;
+
+procedure TTBCore.UnregisterUpdateEvent(Event: TServerUpdateEvent);
+begin
+  ServerUpdateEvents.Remove(Event);
+end;
+
+procedure TTBCore.UnregisterUpdateEvent(Event: TChannelUpdateEvent);
+begin
+  ChannelUpdateEvents.Remove(Event);
 end;
 
 end.

@@ -14,6 +14,15 @@ type
   TTsChannel = class;
   TTsServer = class;
 
+  { Events }
+  TServerUpdateEvent = TNotifyEvent;
+  TChannelUpdateEvent = procedure(Sender: TObject; Channel: TTsChannel) of object;
+  TClientUpdateEvent = procedure(Sender: TObject; Client: TTsClient) of object;
+
+  TServerUpdateEventList = specialize TFPGList<TServerUpdateEvent>;
+  TChannelUpdateEventList = specialize TFPGList<TChannelUpdateEvent>;
+  TClientUpdateEventList = specialize TFPGList<TClientUpdateEvent>;
+
   { Lists }
 
   TTsClientList = specialize TFPGObjectList<TTsClient>;
@@ -29,11 +38,6 @@ type
   EChannelException = class(Exception);
 
   EClientDataException = class(Exception);
-
-  { Events }
-  TServerUpdateEvent = TNotifyEvent;
-  TChannelUpdateEvent = procedure(Sender: TObject; Channel: TTsChannel) of object;
-  TClientUpdateEvent = procedure(Sender: TObject; Client: TTsClient) of object;
 
   { TTsClient }
 
@@ -276,11 +280,10 @@ begin
     Exit;
   try
     if FServer.MoveChannel(ChannelData.ID, AValue.ChannelData.ID) then
-      FChannelData.ParentID := Dest.ChannelData.ID;
+      FChannelData.ParentID := AValue.ChannelData.ID;
   except
     on e: EServerMoveException do ;
   end;
-
 end;
 
 procedure TTsChannel.OnDescriptionNotification(Sender: TObject; ChannelID: integer);

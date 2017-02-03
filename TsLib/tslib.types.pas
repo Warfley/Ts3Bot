@@ -252,7 +252,6 @@ type
 
   {$EndRegion}
 
-
   TIntegerList = specialize TFPGList<integer>;
 
   TStatusResponse = record

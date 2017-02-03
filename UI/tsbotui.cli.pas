@@ -305,7 +305,10 @@ begin
     ctModuleList:
     begin
     if Status then
-      Write('Modules:'+LineEnding+FPrintList.Text)
+      if FPrintList.Count = 0 then
+        WriteLn('No modules registered')
+      else
+        Write('Modules:'+LineEnding+FPrintList.Text)
     else
       WriteLn('Something went wrong. This should never happen');
     LeaveCriticalSection(PrintListCS);

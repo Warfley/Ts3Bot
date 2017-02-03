@@ -208,8 +208,6 @@ begin
 end;
 
 procedure TTsConnection.TelnetDataAvailable(Sender: TIdTelnet; const Buffer: TIdBytes);
-var
-  Response: string;
 begin
   // Lock data
   EnterCriticalsection(FSyncData);
@@ -247,10 +245,10 @@ end;
 
 procedure TTsConnection.FloodControl(Count, Time: Integer);
 begin
-    FAntiFloodData.UseAntiFlood:= (Count >0) and (Time>0);
-    FAntiFloodData.Commands:=Count;
-    FAntiFloodData.Time:=Time;
-    FAntiFloodShit:=GetTickCount64;
+  FAntiFloodData.UseAntiFlood:= (Count >0) and (Time>0);
+  FAntiFloodData.Commands:=Count;
+  FAntiFloodData.Time:=Time;
+  FAntiFloodShit:=GetTickCount64;
 end;
 
 constructor TTsConnection.Create(Host: string; Port: integer);
@@ -354,7 +352,26 @@ end;
 procedure TTsConnection.SendCommand(Cmd: string);
 var
   c: char;
+  diff: QWord;
 begin
+
+  if FAntiFloodData.UseAntiFlood then
+  begin
+    Diff:=GetTickCount64-FAntiFloodShit;
+    FAntiFloodShit:=GetTickCount64;
+    if Diff>FAntiFloodConf.Time then
+    begin
+      FAntiFloodConf.Time:=FAntiFloodData.Time*1000;
+      FAntiFloodConf.Commands:=FAntiFloodData.Commands-1;
+    end
+    else
+      dec(FAntiFloodConf.Time, diff);
+    if FAntiFloodConf.Commands>0 then
+      dec(FAntiFloodConf.Commands)
+    else
+      Sleep(FAntiFloodConf.Time);
+  end;
+
   // Write command via Telnet
   for c in Cmd do
     TelnetConnection.SendCh(c);
@@ -365,25 +382,7 @@ end;
 function TTsConnection.ExecCommand(Cmd: string): TStatusResponse;
 var
   i: integer;
-  Diff: QWord;
 begin
-  if FAntiFloodData.UseAntiFlood then
-  begin
-    Diff:=GetTickCount64-FAntiFloodShit;
-    FAntiFloodShit:=GetTickCount64;
-    if Diff>FAntiFloodConf.Time then
-    begin
-      FAntiFloodConf.Time:=FAntiFloodData.Time*1000;
-      FAntiFloodConf.Commands:=FAntiFloodData.Commands;
-    end
-    else
-      dec(FAntiFloodConf.Time, diff);
-    if FAntiFloodConf.Commands>0 then
-      dec(FAntiFloodConf.Commands)
-    else
-      Sleep(FAntiFloodConf.Time);
-  end;
-
   FLastMessage:='';
   while FWaitingForStatus do //Someone waiting for another command
     Sleep(100);
