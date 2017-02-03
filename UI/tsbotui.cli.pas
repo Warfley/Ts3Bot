@@ -231,6 +231,11 @@ begin
   WriteLn('|connectiondata      | Prints out the connection configuration        |');
   WriteLn('|getantiflood        | Prints out the Antiflood configuration         |');
   WriteLn('|configantiflood     | Sets the antiflood configuration               |');
+  WriteLn('|modulelist          | Prints out a list of all available modules     |');
+  WriteLn('|moduleconfig        | Prints the current configuration of a module   |');
+  WriteLn('|enablemodule        | Enables a module                               |');
+  WriteLn('|disablemodule       | Disables a module                              |');
+  WriteLn('|configmodule        | Sets a modules configuration                   |');
   WriteLn('|resetconfig         | Resets to default (empty) configuration        |');
   WriteLn('|help                | Shows this text                                |');
   WriteLn('\---------------------------------------------------------------------/');
@@ -238,6 +243,9 @@ end;
 
 procedure TCommandLineInterface.CommandExecuted(Sender: TObject;
   Command: TCommandType; Status: boolean);
+var
+  i: Integer;
+  s: String;
 begin
   case Command of
     ctRestart:
@@ -294,6 +302,59 @@ begin
       WriteLn('Antiflood successfully configured')
     else
       WriteLn('Something went wrong. This should never happen');
+    ctModuleList:
+    begin
+    if Status then
+      Write('Modules:'+LineEnding+FPrintList.Text)
+    else
+      WriteLn('Something went wrong. This should never happen');
+    LeaveCriticalSection(PrintListCS);
+    end;
+    ctGetModuleConfig:
+    begin
+    if Status then
+      Write('Module config:'+LineEnding+FPrintList.Text)
+    else
+      WriteLn('Something went wrong. Check log for information');
+    LeaveCriticalSection(PrintListCS);
+    end;
+    ctEnableModule:
+    if Status then
+      WriteLn('Module successfully enabled')
+    else
+      WriteLn('Something went wrong. Check log for information');
+    ctDisableModule:
+    if Status then
+      WriteLn('Module successfully disabled')
+    else
+      WriteLn('Something went wrong. Check log for information');
+    ctGetModuleConfData:
+    if Status then
+    begin
+      for i:=1 to FPrintList.Count-1 do
+      begin
+        Write(FPrintList[i],': ');
+        ReadLn(s);
+        FPrintList[i]:=s;
+      end;
+      with FEventToFire do
+      begin
+        CommandType:=ctConfigModule;
+        Data:=PtrInt(FPrintList);
+        OnFinished:=@CommandExecuted;
+      end;
+      Synchronize(@FireEvent);
+    end
+    else
+      WriteLn('Something went wrong. Check log for information');
+    ctConfigModule:
+    begin
+    if Status then
+      Write('Module configuration successful')
+    else
+      WriteLn('Something went wrong. Check log for information');
+    LeaveCriticalSection(PrintListCS);
+    end;
     ctResetConfig:
     if Status then
       WriteLn('Config successfully reseted')
@@ -380,6 +441,47 @@ begin
         FPrintList.Clear;
         Data:=PtrInt(FPrintList);
         CommandType:=ctGetAntiflood;
+      end
+      else if s = 'modulelist' then
+      begin
+        EnterCriticalSection(PrintListCS);
+        FPrintList.Clear;
+        Data:=PtrInt(FPrintList);
+        CommandType:=ctModuleList;
+      end
+      else if s = 'moduleconfig' then
+      begin
+        EnterCriticalSection(PrintListCS);
+        FPrintList.Clear;
+        Write('Module name: ');
+        ReadLn(s);
+        FPrintList.Add(s);
+        Data:=PtrInt(FPrintList);
+        CommandType:=ctGetModuleConfig;
+      end
+      else if s = 'enablemodule' then
+      begin
+        New(PString(Data));
+        Write('Module name: ');
+        ReadLn(PString(Data)^);
+        CommandType:=ctEnableModule;
+      end
+      else if s = 'disablemodule' then
+      begin
+        New(PString(Data));
+        Write('Module name: ');
+        ReadLn(PString(Data)^);
+        CommandType:=ctDisableModule;
+      end
+      else if s = 'configmodule' then
+      begin
+        EnterCriticalSection(PrintListCS);
+        FPrintList.Clear;
+        Write('Module name: ');
+        ReadLn(s);
+        FPrintList.Add(s);
+        Data:=IntPtr(FPrintList);
+        CommandType:=ctGetModuleConfData;
       end
       else if s='resetconfig' then
       begin

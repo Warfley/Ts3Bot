@@ -6,11 +6,40 @@ interface
 
 uses
   Classes, SysUtils, TsBot.Config, Logger, TsLib.Types, TsLib.Connection,
-  TsLib.NotificationManager, TsBotUI.Types, syncobjs, TsLib.Server, gvector;
+  TsLib.NotificationManager, TsBotUI.Types, syncobjs, TsLib.Server, gvector,
+  fgl, DOM;
 
 type
+  TTBCore = class(TThread);
 
   { TTBCore }
+
+  TBotModule = class
+  protected
+    // enable/disable Module
+    function GetEnabled: Boolean; virtual; abstract;
+    procedure SetEnabled(AValue: Boolean); virtual; abstract;
+    // Returns the name of the module
+    function GetName: String; virtual; abstract;
+  public
+    constructor Create(Core: TTBCore); virtual; abstract;
+
+    // Called after the serverdata is collected
+    procedure InitModule; virtual; abstract;
+    // called before the cleanup
+    procedure DoneModule; virtual; abstract;
+
+    // for modules that want to use the config
+    procedure ReadConfig(doc: TXMLDocument); virtual; abstract;
+    procedure WriteConfig(doc: TXMLDocument); virtual; abstract;
+
+    function ConfigModule(Config: TStringList): Boolean; virtual; abstract;
+    procedure GetConfigItems(Sl: TStringList); virtual; abstract;
+    procedure GetConfig(SL: TStringList); virtual; abstract;
+
+    property Enabled: Boolean read GetEnabled write SetEnabled;
+    property Name: String read GetName;
+  end;
 
   TDataEvent = procedure (Sender: TObject; Data: IntPtr) of object;
 
@@ -22,6 +51,7 @@ type
   end;
 
   TSchedules = specialize TVector<TScheduleInfo>;
+  TModuleList = specialize TFPGObjectList<TBotModule>;
 
   TTBCore = class(TThread)
   private
@@ -36,6 +66,7 @@ type
     FIdleToTerminate: boolean;
     FSchedules: TSchedules;
     FServer: TTsServer;
+    Modules: TModuleList;
     function GetConfig: TConfig;
     procedure SetAutoRestart(AValue: boolean);
     procedure SleepAndCheck(Time: integer; Step: integer = 100);
@@ -52,6 +83,7 @@ type
     procedure UpdateClients(Sender: TObject; Data: IntPtr);
     procedure UpdateServer(Sender: TObject; Data: IntPtr);
   public
+    function FindModule(Name: String): TBotModule;
     procedure ClearSchedules;
     procedure RegisterSchedule(Time: Integer; Code: TDataEvent; Data: Integer=0);
     procedure RemoveSchedule(Code: TDataEvent; Data: Integer=0);
@@ -63,6 +95,9 @@ type
     property Config: TConfig read GetConfig;
     property AutoRestart: boolean read FAutoRestart write SetAutoRestart;
     property IdleToTerminate: boolean read FIdleToTerminate write FIdleToTerminate;
+    property Connection: TTsConnection read FConnection;
+    property Server: TTsServer read FServer;
+    property NotificationManager: TNotificationManager read FNotificationManager;
   end;
 
 implementation
@@ -114,6 +149,9 @@ procedure TTBCore.RunCommands;
 var
   c: TCommandEventData;
   s: boolean;
+  str: string;
+  i: Integer;
+  m: TBotModule;
 begin
   EnterCriticalsection(CommandCS);
   try
@@ -224,6 +262,68 @@ begin
             LeaveCriticalsection(ConfigCS);
             Dispose(PAntiFloodInfo(c.Data));
           end;
+        ctModuleList:
+        begin
+          for i:=0 to Modules.Count-1 do
+            TStringList(c.Data).Add(Modules[i].Name);
+          s := True;
+        end;
+        ctGetModuleConfig:
+        begin
+          m:=FindModule(TStringList(c.Data)[0]);
+          TStringList(c.Data).Clear;
+          s:=Assigned(m);
+          if s then
+            m.GetConfig(TStringList(c.Data))
+          else
+            WriteError(1295, 'Module not found');
+        end;
+        ctEnableModule:
+        try
+          m:=FindModule(PString(c.Data)^);
+          s:=Assigned(m);
+          if s then
+            m.Enabled:=True
+          else
+            WriteError(1295, 'Module not found');
+        finally
+          Dispose(PString(c.Data));
+        end;
+        ctDisableModule:
+        try
+          m:=FindModule(PString(c.Data)^);
+          s:=Assigned(m);
+          if s then
+            m.Enabled:=False
+          else
+            WriteError(1295, 'Module not found');
+        finally
+          Dispose(PString(c.Data));
+        end;
+        ctGetModuleConfData:
+        begin
+          str:=TStringList(c.Data)[0];
+          m:=FindModule(str);
+          TStringList(c.Data).Clear;
+          s:=Assigned(m);
+          if s then
+          begin
+            m.GetConfigItems(TStringList(c.Data));
+            TStringList(c.Data).Insert(0, str);
+          end
+          else
+            WriteError(1295, 'Module not found');
+        end;
+        ctConfigModule:
+        begin
+          m:=FindModule(TStringList(c.Data)[0]);
+          TStringList(c.Data).Delete(0);
+          s:=Assigned(m);
+          if s then
+            s:=m.ConfigModule(TStringList(c.Data))
+          else
+            WriteError(1295, 'Module not found');
+        end;
         ctResetConfig:
           try
             EnterCriticalsection(ConfigCS);
@@ -304,6 +404,9 @@ begin
     FServer.UpdateServerData;
     WriteStatus('Requesting channellist');
     FServer.UpdateChannelList(FullChannelUpdate);
+    WriteStatus('Requesting clientlist');
+    FServer.UpdateClientList(FullClientUpdate);
+
     // Adding schedules
     if Config.UpdateServerData >= 0 then
       RegisterSchedule(Config.UpdateServerData, @UpdateServer);
@@ -409,6 +512,19 @@ begin
   FServer.UpdateServerData;
 end;
 
+function TTBCore.FindModule(Name: String): TBotModule;
+var
+  i: Integer;
+begin
+  Result:=nil;
+  for i:=0 to Modules.Count-1 do
+    if Modules[i].Name=Name then
+    begin
+      Result:=Modules[i];
+      break;
+    end;
+end;
+
 procedure TTBCore.ClearSchedules;
 begin
   EnterCriticalsection(ScheduleCS);
@@ -490,6 +606,7 @@ begin
   FCommandList := TCommandList.Create;
   FIdleToTerminate := AIdleToTerminate;
   FSchedules:=TSchedules.Create;
+  Modules:=TModuleList.Create(True);
   inherited Create(False);
 end;
 
@@ -502,6 +619,7 @@ begin
   DoneCriticalsection(ScheduleCS);
   FSchedules.Free;
   FCommandList.Free;
+  Modules.Free;
   inherited Destroy;
 end;
 

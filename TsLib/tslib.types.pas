@@ -60,7 +60,7 @@ type
     QueryClients: Integer;
     Channels: Integer;
     CreationDate: TDateTime;
-    Uptime: Cardinal;
+    Uptime: UInt64;
     HostMessage: String;
     MessageMode: Boolean;
     DefaultSGroup: Integer;
@@ -179,15 +179,22 @@ type
 
   TDynIntArray = array of integer;
 
+  TClientUpdate = (clUID, clAway, clVoice, clTimes, clGroups, clInfo, clCountry, clIP, clBadges);
+  TClientUpdates = set of TClientUpdate;
+
   TClientData = record
     ID: integer;
+    ChannelID: Integer;
     UID: string;
+    UIDHash: string;
     Name: string;
+    LoginName: string;
+    IsTalking: Boolean;
     MutedInput: boolean;
     MutedOutput: boolean;
     MutedOutputOnly: boolean;
-    InputHardware: boolean;
-    OutputHardware: boolean;
+    InputHardware: Integer;
+    OutputHardware: Integer;
     MetaData: string;
     Recording: boolean;
     DatabaseID: integer;
@@ -202,15 +209,32 @@ type
     TalkRequestMessage: string;
     Description: string;
     IsTalker: boolean;
+    DefaultChannel: String;
     IsPrioritySpeaker: boolean;
     UnreadMessages: integer;
     PhoneticNickname: string;
     NeededServerQuerryViewPower: integer;
     IconID: integer;
     IsChannelCommander: boolean;
+    Version: String;
+    VersionHash: String;
+    SecurityHash: String;
     Country: string;
+    IP: String;
+    TotalConnections: Integer;
+    BytesDLTotal: UInt64;
+    BytesDLMonth: UInt64;
+    BytesULTotal: UInt64;
+    BytesULMonth: UInt64;
+    CreationDate: TDateTime;
+    LastConnectionDate: TDateTime;
+    IdleTime: QWord;
+    Platform: TOperatingSystem;
+    DefaultToken: String;
     ChannelGroupInheritedChannel: integer;
     Badges: string;
+    ConnectionTime: UInt64;
+    Connection: TConnectionData;
   end;
 
   {$EndRegion}
@@ -253,6 +277,8 @@ function GetNotificationType(Str: string): TNotificationType;
 const
   FullChannelUpdate = [cuTopic..cuSecondsEmpty];
   DefaultChannelUpdate = [cuSecondsEmpty];
+  FullClientUpdate = [clUID..clBadges];
+  DefaultClientUpdate = [clUID, clVoice, clTimes, clAway];
 
 implementation
 
@@ -275,6 +301,7 @@ begin
         SetClientData(sl[i], '', Client)
       else
         SetClientData(sl.Names[i], sl.ValueFromIndex[i], Client);
+    Client.Connection := Str;
   finally
     sl.Free;
   end;
@@ -285,10 +312,16 @@ begin
   with Client do
     if AName = 'clid' then
       ReadValue(Value, ID)
+    else if AName = 'cid' then
+      ReadValue(Value, ChannelID)
     else if AName = 'client_unique_identifier' then
       ReadValue(Value, UID)
+    else if AName = 'client_base64HashClientUID' then
+      ReadValue(Value, UIDHash)
     else if AName = 'client_nickname' then
       ReadValue(Value, Name)
+    else if AName = 'client_flag_talking' then
+      ReadValue(Value, isTalking)
     else if AName = 'client_input_muted' then
       ReadValue(Value, MutedInput)
     else if AName = 'client_output_muted' then
@@ -313,6 +346,14 @@ begin
       ReadValue(Value, IsAway)
     else if AName = 'client_away_message' then
       ReadValue(Value, AfkMessage)
+    else if AName = 'client_idle_time' then
+      ReadValue(Value, IdleTime)
+    else if AName = 'client_platform' then
+      ReadValue(Value, Platform)
+    else if AName = 'client_lastconnected' then
+      ReadValue(Value, LastConnectionDate)
+    else if AName = 'client_created' then
+      ReadValue(Value, CreationDate)
     else if AName = 'client_type' then
       ReadValue(Value, CType)
     else if AName = 'client_flag_avatar' then
@@ -337,10 +378,36 @@ begin
       ReadValue(Value, NeededServerQuerryViewPower)
     else if AName = 'client_icon_id' then
       ReadValue(Value, IconID)
+    else if AName = 'client_version' then
+      ReadValue(Value, Version)
     else if AName = 'client_is_channel_commander' then
       ReadValue(Value, IsChannelCommander)
     else if AName = 'client_country' then
       ReadValue(Value, Country)
+    else if AName = 'connection_client_ip' then
+      ReadValue(Value, IP)
+    else if AName = 'client_default_channel' then
+      ReadValue(Value, DefaultChannel)
+    else if AName = 'client_version_sign' then
+      ReadValue(Value, VersionHash)
+    else if AName = 'client_security_hash' then
+      ReadValue(Value, SecurityHash)
+    else if AName = 'client_login_name' then
+      ReadValue(Value, LoginName)
+    else if AName = 'client_totalconnections' then
+      ReadValue(Value, TotalConnections)
+    else if AName = 'client_month_bytes_uploaded' then
+      ReadValue(Value, BytesULMonth)
+    else if AName = 'client_month_bytes_downloaded' then
+      ReadValue(Value, BytesDLMonth)
+    else if AName = 'client_total_bytes_uploaded' then
+      ReadValue(Value, BytesULTotal)
+    else if AName = 'client_total_bytes_downloaded' then
+      ReadValue(Value, BytesDLTotal)
+    else if AName = 'client_default_token' then
+      ReadValue(Value, DefaultToken)
+    else if AName = 'connection_connected_time' then
+      ReadValue(Value, ConnectionTime)
     else if AName = 'client_channel_group_inherited_channel_id' then
       ReadValue(Value,
         ChannelGroupInheritedChannel)

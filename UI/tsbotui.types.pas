@@ -10,7 +10,9 @@ uses
 
 type
   TCommandType = (ctQuit, ctRestart, ctSetConnectionData, ctSwitchServer, ctGetConnectionData,
-                 ctChangeLogPath, ctGetLogPath, ctResetConfig, ctGetAntiflood, ctSetAntiflood);
+                 ctChangeLogPath, ctGetLogPath, ctResetConfig, ctGetAntiflood, ctSetAntiflood,
+                 ctModuleList, ctEnableModule, ctDisableModule, ctGetModuleConfig,
+                 ctGetModuleConfData, ctConfigModule);
 
   PConnectionData = ^TConnectionData;
 
