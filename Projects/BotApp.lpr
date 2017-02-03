@@ -8,7 +8,7 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Classes, sysutils, TsBot.core, TsLib.NotificationManager, TsLib.Types,
-TsBotUI.CLI, TsBotUI.Types, Logger, TsLib.Server;
+TsBotUI.CLI, TsBotUI.Types, Logger, TsLib.Server, TsBot.AfkModule;
 
 var Bot: TTBCore;
 

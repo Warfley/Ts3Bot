@@ -82,7 +82,6 @@ function TNotificationManager.NotificationRecieved(Sender: TObject;
 var
   n: PNotificationData;
   lst: TList;
-  found: Boolean;
   i: Integer;
 begin
   RemoveFromList := False;

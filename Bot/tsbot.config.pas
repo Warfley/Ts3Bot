@@ -5,7 +5,7 @@ unit TsBot.config;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, DOM, XMLRead, XMLWrite;
 
 type
   TConfig = record
@@ -21,6 +21,8 @@ type
     FloodCommands, FloodTime: Integer;
   end;
 
+  TConfigEvent = procedure(Doc: TXMLDocument) of object;
+
 const
   DefaultConf: TConfig = (Username: 'User'; Password: 'Pass';
     IPAddress: '127.0.0.1'; Port: 10011; ServerID: 1;
@@ -30,14 +32,12 @@ const
     FloodTime: -1);
   ConfigVersion = 1;
 
-function ReadConfig(Path: string): TConfig;
-procedure WriteConfig(Path: string; Config: TConfig);
+function ReadConfig(Path: string; OnRead: TConfigEvent): TConfig;
+procedure WriteConfig(Path: string; Config: TConfig; OnWrite: TConfigEvent);
 
 implementation
 
-uses DOM, XMLRead, XMLWrite;
-
-function ReadConfig(Path: string): TConfig;
+function ReadConfig(Path: string; OnRead: TConfigEvent): TConfig;
 
 
 function IsNumeric(Str: String): Boolean;
@@ -144,12 +144,16 @@ begin
     ReadLoginData(doc);
     ReadUpdateInterval(doc);
     ReadFloodControl(doc);
+
+    if Assigned(OnRead) then
+      OnRead(doc);
+
   finally
     doc.Free;
   end;
 end;
 
-procedure WriteConfig(Path: string; Config: TConfig);
+procedure WriteConfig(Path: string; Config: TConfig; OnWrite: TConfigEvent);
 var
   doc: TXMLDocument;
   RootNode, ParentNode, DataNode: TDOMNode;
@@ -194,6 +198,9 @@ begin
     // Adding update intervalls
     TDOMElement(ParentNode).SetAttribute('Time', IntToStr(Config.FloodTime));
     TDOMElement(ParentNode).SetAttribute('Commands', IntToStr(Config.FloodCommands));
+
+    if Assigned(OnWrite) then
+      OnWrite(doc);
 
     WriteXMLFile(doc, Path);
   finally

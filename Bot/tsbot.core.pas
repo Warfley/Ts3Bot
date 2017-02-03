@@ -14,7 +14,7 @@ uses
   syncobjs,
   gvector,
   fgl,
-  DOM;
+  DOM, XMLRead, XMLWrite;
 
 type
   TTBCore = class;
@@ -51,8 +51,8 @@ type
   TDataEvent = procedure (Sender: TObject; Data: IntPtr) of object;
 
   TScheduleInfo = record
-    Time: Integer;
-    Remaining: Integer;
+    Time: Int64;
+    Remaining: Int64;
     Code: TDataEvent;
     Data: IntPtr;
   end;
@@ -76,15 +76,16 @@ type
     FSchedules: TSchedules;
     FServer: TTsServer;
     Modules: TModuleList;
-    FOnRegisterModules: TRegisterModuleEvent;
     ClientUpdateEvents: TClientUpdateEventList;
     ServerUpdateEvents: TServerUpdateEventList;
     ChannelUpdateEvents: TChannelUpdateEventList;
+    FClientUpdate: TClientUpdates;
+    FChannelUpdate: TChannelUpdates;
     function GetConfig: TConfig;
     procedure SetAutoRestart(AValue: boolean);
     procedure SleepAndCheck(Time: integer; Step: integer = 100);
     procedure RunCommands;
-    procedure RunSchedules(Time: QWord);
+    procedure RunSchedules(Time: Int64);
     { Private declarations }
   protected
     procedure ChannelUpdated(Sender: TObject; Channel: TTsChannel);
@@ -98,16 +99,20 @@ type
     procedure UpdateChannels(Sender: TObject; Data: IntPtr);
     procedure UpdateClients(Sender: TObject; Data: IntPtr);
     procedure UpdateServer(Sender: TObject; Data: IntPtr);
+    procedure RegisterModules; virtual;
+    procedure InitModules; virtual;
+    procedure DoneModules; virtual;
+    procedure LoadModuleConfig(Doc: TXMLDocument);
+    procedure SaveModuleConfig(Doc: TXMLDocument);
   public
     function FindModule(Name: String): TBotModule;
     procedure ClearSchedules;
-    procedure RegisterSchedule(Time: Integer; Code: TDataEvent; Data: Integer=0);
+    procedure RegisterSchedule(Time: Int64; Code: TDataEvent; Data: Integer=0);
     procedure RemoveSchedule(Code: TDataEvent; Data: Integer=0);
     procedure Restart;
     procedure RegisterCommand(C: TCommandEventData);
     constructor Create(AOnTerminate: TNotifyEvent; ConfPath: string;
-      AAutoRestart: boolean; AIdleToTerminate: boolean = True;
-      RegisterModules: TRegisterModuleEvent = nil);
+      AAutoRestart: boolean; AIdleToTerminate: boolean = True);
     destructor Destroy; override;
     procedure RegisterClientUpdateEvent(Event: TClientUpdateEvent);
     procedure RegisterServerUpdateEvent(Event: TServerUpdateEvent);
@@ -121,10 +126,13 @@ type
     property Connection: TTsConnection read FConnection;
     property Server: TTsServer read FServer;
     property NotificationManager: TNotificationManager read FNotificationManager;
-    property OnRegisterModules: TRegisterModuleEvent read FOnRegisterModules write FOnRegisterModules;
+    property ClientUpdate: TClientUpdates read FClientUpdate write FClientUpdate;
+    property ChannelUpdate: TChannelUpdates read FChannelUpdate write FChannelUpdate;
   end;
 
 implementation
+
+uses TsBot.AfkModule;
 
 { TTBCore }
 
@@ -289,7 +297,7 @@ begin
         ctModuleList:
         begin
           for i:=0 to Modules.Count-1 do
-            TStringList(c.Data).Add(Modules[i].Name);
+            TStringList(c.Data).Add(Modules[i].Name + ' Active: '+BoolToStr(Modules[i].Enabled, True));
           s := True;
         end;
         ctGetModuleConfig:
@@ -351,7 +359,7 @@ begin
         ctResetConfig:
           try
             EnterCriticalsection(ConfigCS);
-            FConfig := ReadConfig('');
+            FConfig := ReadConfig('', @LoadModuleConfig);
             Restart;
             s := True;
           finally
@@ -367,7 +375,7 @@ begin
   end;
 end;
 
-procedure TTBCore.RunSchedules(Time: QWord);
+procedure TTBCore.RunSchedules(Time: Int64);
 var
   s: TScheduleInfo;
   i: Integer;
@@ -384,6 +392,7 @@ begin
           s.Code(Self, s.Data);
         s.Remaining:=s.Time;
       end;
+      FSchedules[i]:=s;
     end;
   finally
     LeaveCriticalsection(ScheduleCS);
@@ -466,12 +475,11 @@ begin
     if Config.UpdateClientList >= 0 then
       RegisterSchedule(Config.UpdateClientList, @UpdateClients);
 
+    InitModules();
+
     // Set up notifications
     FServer.UseNotifications := True;
     FNotificationManager.Active := True;
-
-    if Assigned(FOnRegisterModules) then
-      FOnRegisterModules(Self, Modules);
 
     LastTick := GetTickCount64;
 
@@ -487,6 +495,8 @@ begin
       RunCommands;
       Sleep(100);
     end;
+
+    DoneModules();
   finally
     FServer.Free;
   end;
@@ -494,9 +504,10 @@ end;
 
 procedure TTBCore.Execute;
 begin
+  RegisterModules;
   EnterCriticalsection(ConfigCS);
   try
-    FConfig := ReadConfig(FConfigPath);
+    FConfig := ReadConfig(FConfigPath, @LoadModuleConfig);
   finally
     LeaveCriticalsection(ConfigCS);
   end;
@@ -544,7 +555,7 @@ begin
   finally
     EnterCriticalsection(ConfigCS);
     try
-      WriteConfig(FConfigPath, FConfig);
+      WriteConfig(FConfigPath, FConfig, @SaveModuleConfig);
     finally
       LeaveCriticalsection(ConfigCS);
     end;
@@ -564,6 +575,39 @@ end;
 procedure TTBCore.UpdateServer(Sender: TObject; Data: IntPtr);
 begin
   FServer.UpdateServerData;
+end;
+
+procedure TTBCore.RegisterModules;
+begin
+  Modules.Add(TAfkModule.Create(Self));
+end;
+
+procedure TTBCore.InitModules;
+var i: Integer;
+begin
+  for i:=0 to Modules.Count-1 do
+    Modules[i].InitModule;
+end;
+
+procedure TTBCore.DoneModules;
+var i: Integer;
+begin
+  for i:=0 to Modules.Count-1 do
+    Modules[i].DoneModule;
+end;
+
+procedure TTBCore.LoadModuleConfig(Doc: TXMLDocument);
+var i: Integer;
+begin
+  for i:=0 to Modules.Count-1 do
+    Modules[i].ReadConfig(Doc);
+end;
+
+procedure TTBCore.SaveModuleConfig(Doc: TXMLDocument);
+var i: Integer;
+begin
+  for i:=0 to Modules.Count-1 do
+    Modules[i].WriteConfig(Doc);
 end;
 
 function TTBCore.FindModule(Name: String): TBotModule;
@@ -589,8 +633,8 @@ begin
   end;
 end;
 
-procedure TTBCore.RegisterSchedule(Time: Integer; Code: TDataEvent;
-  Data: Integer);
+procedure TTBCore.RegisterSchedule(Time: Int64; Code: TDataEvent; Data: Integer
+  );
 var s: TScheduleInfo;
 begin
   EnterCriticalsection(ScheduleCS);
@@ -647,8 +691,7 @@ begin
 end;
 
 constructor TTBCore.Create(AOnTerminate: TNotifyEvent; ConfPath: string;
-  AAutoRestart: boolean; AIdleToTerminate: boolean;
-  RegisterModules: TRegisterModuleEvent);
+  AAutoRestart: boolean; AIdleToTerminate: boolean);
 begin
   FAutoRestart := AAutoRestart;
   FConfigPath := ConfPath;
@@ -662,10 +705,11 @@ begin
   FIdleToTerminate := AIdleToTerminate;
   FSchedules:=TSchedules.Create;
   Modules:=TModuleList.Create(True);
-  FOnRegisterModules:=RegisterModules;
   ServerUpdateEvents:=TServerUpdateEventList.Create;
   ClientUpdateEvents:=TClientUpdateEventList.Create;
   ChannelUpdateEvents:=TChannelUpdateEventList.Create;
+  FClientUpdate:=[];
+  FChannelUpdate:=[];
   inherited Create(False);
 end;
 

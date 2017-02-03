@@ -39,6 +39,8 @@ type
 
   EClientDataException = class(Exception);
 
+  EMessageException = class(Exception);
+
   { TTsClient }
 
   TTsClient = class
@@ -149,7 +151,7 @@ type
     function IndexOfChannel(ChannelID: integer): integer;
     function IndexOfChannel(ChannelName: string): integer;
     function GetChannelByID(CID: integer): TTsChannel;
-    function GetChannelByName(Name: integer): TTsChannel;
+    function GetChannelByName(Name: string): TTsChannel;
 
     function IndexOfClientUID(UID: string): integer;
     function IndexOfClient(ClientID: integer): integer;
@@ -160,6 +162,10 @@ type
 
     function MoveClient(ClientID: integer; ChannelID: integer): boolean;
     function MoveChannel(ChannelID, ParentID: integer; Order: integer = -1): boolean;
+
+    function SendPrivateMessage(Message: string; ClientID: integer): boolean;
+    function SendChannelMessage(Message: string; ChannelID: integer): boolean;
+    function SendServerMessage(Message: string): boolean;
 
     property Connection: TTsConnection read FConnection write FConnection;
     property NotificationManager: TNotificationManager
@@ -516,7 +522,7 @@ begin
   if FullUpdate then
     FClients.Clear
   else
-    for i := 0 to FChannels.Count - 1 do   // or mark as unupdate
+    for i := 0 to FClients.Count - 1 do   // or mark as unupdate
       FClients[i].Flag := True;
   sl := TStringList.Create;
   try
@@ -604,6 +610,7 @@ begin
     WriteError(res.ErrNo, res.Msg);
     raise EChannelDataException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
   end;
+
   // Clear channels
   if FullUpdate then
     FChannels.Clear
@@ -710,7 +717,7 @@ begin
     Result := nil;
 end;
 
-function TTsServer.GetChannelByName(Name: integer): TTsChannel;
+function TTsServer.GetChannelByName(Name: string): TTsChannel;
 var
   idx: integer;
 begin
@@ -800,7 +807,7 @@ var
 begin
   res := FConnection.ExecCommand(Format('clientmove clid=%d cid=%d',
     [ClientID, ChannelID]));
-  Result := res.ErrNo = 0;
+  Result := res.ErrNo <= 0;
   if not Result then
   begin
     WriteError(res.ErrNo, res.Msg);
@@ -823,6 +830,48 @@ begin
   begin
     WriteError(res.ErrNo, res.Msg);
     raise EServerMoveException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
+  end;
+end;
+
+function TTsServer.SendPrivateMessage(Message: string; ClientID: integer): boolean;
+var
+  res: TStatusResponse;
+begin
+  res := FConnection.ExecCommand(Format('sendtextmessage targetmode=%d target=%d msg=%s',
+    [1, ClientID, EncodeStr(Message)]));
+  Result := res.ErrNo = 0;
+  if not Result then
+  begin
+    WriteError(res.ErrNo, res.Msg);
+    raise EMessageException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
+  end;
+end;
+
+function TTsServer.SendChannelMessage(Message: string; ChannelID: integer): boolean;
+var
+  res: TStatusResponse;
+begin
+  res := FConnection.ExecCommand(Format('sendtextmessage targetmode=%d target=%d msg=%s',
+    [2, ChannelID, EncodeStr(Message)]));
+  Result := res.ErrNo = 0;
+  if not Result then
+  begin
+    WriteError(res.ErrNo, res.Msg);
+    raise EMessageException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
+  end;
+end;
+
+function TTsServer.SendServerMessage(Message: string): boolean;
+var
+  res: TStatusResponse;
+begin
+  res := FConnection.ExecCommand(Format('sendtextmessage targetmode=%d target=%d msg=%s',
+    [3, FConnection.ServerID, EncodeStr(Message)]));
+  Result := res.ErrNo = 0;
+  if not Result then
+  begin
+    WriteError(res.ErrNo, res.Msg);
+    raise EMessageException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
   end;
 end;
 

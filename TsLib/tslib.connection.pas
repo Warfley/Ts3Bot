@@ -81,9 +81,94 @@ type
     property RecieversThreaded: boolean read FRecieversThreaded write FRecieversThreaded;
   end;
 
+
+  function EncodeStr(Str: String): String;
 implementation
 
 uses strutils;
+
+function EncodeStr(Str: String): String;
+var p, i, len: Integer;
+begin
+  len:=Length(str);
+  SetLength(Result, 2*len);
+  p:=1;
+  i:=1;
+  while i<=len do
+  begin
+    if Str[i] = #92 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#92;
+      inc(p);
+    end
+    else if Str[i] = #47 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#47;
+      inc(p);
+    end
+    else if Str[i] = #32 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#115;
+      inc(p);
+    end
+    else if Str[i] = #124 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#112;
+      inc(p);
+    end
+    else if Str[i] = #7 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#97;
+      inc(p);
+    end
+    else if Str[i] = #8 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#98;
+      inc(p);
+    end
+    else if Str[i] = #12 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#102;
+      inc(p);
+    end
+    else if Str[i] = #10 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#110;
+      inc(p);
+    end
+    else if Str[i] = #13 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#114;
+      inc(p);
+    end
+    else if Str[i] = #9 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#116;
+      inc(p);
+    end
+    else if Str[i] = #11 then
+    begin
+      Result[p]:=#92;
+      Result[p+1]:=#118;
+      inc(p);
+    end
+    else
+      Result[p]:=Str[i];
+    inc(i);
+    inc(p);
+  end;
+  SetLength(Result,p-1);
+end;
 
 { TTsConnection }
 
