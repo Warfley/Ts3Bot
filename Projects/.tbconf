@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Config Version="1">
-  <Login IP="127.0.0.1" Port="10011" LogFile="./log.txt" ServerID="1">
-    <User Pass="Pass" User="User"/>
-  </Login>
-</Config>
