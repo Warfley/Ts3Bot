@@ -607,6 +607,8 @@ begin
   FClients.Free;
   FChannels.Free;
   FChannelTree.Free;
+  FServerGroups.Free;
+  FChannelGroups.Free;
   inherited Destroy;
 end;
 

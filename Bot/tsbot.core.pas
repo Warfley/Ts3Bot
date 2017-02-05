@@ -823,7 +823,7 @@ begin
   Modules := TModuleList.Create(True);
   ChannelUpdateEvents := TChannelUpdateEventList.Create;
   ClientUpdateEvents := TClientUpdateEventList.Create;
-  ChannelUpdateEvents := TChannelUpdateEventList.Create;
+  ServerUpdateEvents := TServerUpdateEventList.Create;
   ClientMoveEvents := TClientMoveEventList.Create;
   ClientConnectEvents := TClientConnectedEventList.Create;
   ClientDisconnectEvents := TClientDisconnectedEventList.Create;
@@ -844,7 +844,7 @@ begin
   Modules.Free;
   ChannelUpdateEvents.Free;
   ClientUpdateEvents.Free;
-  ChannelUpdateEvents.Free;
+  ServerUpdateEvents.Free;
   ClientMoveEvents.Free;
   ClientConnectEvents.Free;
   ClientDisconnectEvents.Free;
