@@ -9,12 +9,16 @@ uses
   SysUtils,
   Logger,
   TsBot.Config,
-  TsLib.Types, TsLib.Connection, TsLib.NotificationManager, TsLib.Server,
+  TsBot.Utils,
+  TsLib.Types,
+  TsLib.Connection,
+  TsLib.NotificationManager,
+  TsLib.Server,
   TsBotUI.Types,
   syncobjs,
   gvector,
   fgl,
-  DOM, XMLRead, XMLWrite;
+  DOM;
 
 type
   TTBCore = class;
@@ -24,10 +28,10 @@ type
   TBotModule = class
   protected
     // enable/disable Module
-    function GetEnabled: Boolean; virtual; abstract;
-    procedure SetEnabled(AValue: Boolean); virtual; abstract;
+    function GetEnabled: boolean; virtual; abstract;
+    procedure SetEnabled(AValue: boolean); virtual; abstract;
     // Returns the name of the module
-    function GetName: String; virtual; abstract;
+    function GetName: string; virtual; abstract;
   public
     constructor Create(Core: TTBCore); virtual; abstract;
 
@@ -40,19 +44,21 @@ type
     procedure ReadConfig(doc: TXMLDocument); virtual; abstract;
     procedure WriteConfig(doc: TXMLDocument); virtual; abstract;
 
-    function ConfigModule(Config: TStringList): Boolean; virtual; abstract;
+    function ConfigModule(Config: TStringList): boolean; virtual; abstract;
     procedure GetConfigItems(Sl: TStringList); virtual; abstract;
     procedure GetConfig(SL: TStringList); virtual; abstract;
 
-    property Enabled: Boolean read GetEnabled write SetEnabled;
-    property Name: String read GetName;
+    function GetHelp: string; virtual; abstract;
+
+    property Enabled: boolean read GetEnabled write SetEnabled;
+    property Name: string read GetName;
   end;
 
-  TDataEvent = procedure (Sender: TObject; Data: IntPtr) of object;
+  TDataEvent = procedure(Sender: TObject; Data: IntPtr) of object;
 
   TScheduleInfo = record
-    Time: Int64;
-    Remaining: Int64;
+    Time: int64;
+    Remaining: int64;
     Code: TDataEvent;
     Data: IntPtr;
   end;
@@ -79,16 +85,23 @@ type
     ClientUpdateEvents: TClientUpdateEventList;
     ServerUpdateEvents: TServerUpdateEventList;
     ChannelUpdateEvents: TChannelUpdateEventList;
+    ClientMoveEvents: TClientMoveEventList;
+    ClientConnectEvents: TClientConnectedEventList;
+    ClientDisconnectEvents: TClientDisconnectedEventList;
     FClientUpdate: TClientUpdates;
     FChannelUpdate: TChannelUpdates;
     function GetConfig: TConfig;
     procedure SetAutoRestart(AValue: boolean);
     procedure SleepAndCheck(Time: integer; Step: integer = 100);
     procedure RunCommands;
-    procedure RunSchedules(Time: Int64);
+    procedure RunSchedules(Time: int64);
     { Private declarations }
   protected
     procedure ChannelUpdated(Sender: TObject; Channel: TTsChannel);
+    procedure ClientConnected(Sender: TObject; Client: TTsClient);
+    procedure ClientDisconnected(Sender: TObject; Client: TTsClient);
+    procedure ClientMoved(Sender: TObject; Client: TTsClient;
+      Source, Target: TTsChannel);
     procedure ClientUpdated(Sender: TObject; Client: TTsClient);
     procedure ServerUpdated(Sender: TObject);
     { Protected declarations }
@@ -96,19 +109,22 @@ type
     procedure CleanUp;
     procedure Run;
     procedure Execute; override;
+    procedure UpdateChannelGroups(Sender: TObject; Data: IntPtr);
     procedure UpdateChannels(Sender: TObject; Data: IntPtr);
     procedure UpdateClients(Sender: TObject; Data: IntPtr);
     procedure UpdateServer(Sender: TObject; Data: IntPtr);
+    procedure SaveConfig(Sender: TObject; Data: IntPtr);
     procedure RegisterModules; virtual;
     procedure InitModules; virtual;
     procedure DoneModules; virtual;
     procedure LoadModuleConfig(Doc: TXMLDocument);
     procedure SaveModuleConfig(Doc: TXMLDocument);
+    procedure UpdateServerGroups(Sender: TObject; Data: IntPtr);
   public
-    function FindModule(Name: String): TBotModule;
+    function FindModule(Name: string): TBotModule;
     procedure ClearSchedules;
-    procedure RegisterSchedule(Time: Int64; Code: TDataEvent; Data: Integer=0);
-    procedure RemoveSchedule(Code: TDataEvent; Data: Integer=0);
+    procedure RegisterSchedule(Time: int64; Code: TDataEvent; Data: integer = 0);
+    procedure RemoveSchedule(Code: TDataEvent; Data: integer = 0);
     procedure Restart;
     procedure RegisterCommand(C: TCommandEventData);
     constructor Create(AOnTerminate: TNotifyEvent; ConfPath: string;
@@ -117,9 +133,15 @@ type
     procedure RegisterClientUpdateEvent(Event: TClientUpdateEvent);
     procedure RegisterServerUpdateEvent(Event: TServerUpdateEvent);
     procedure RegisterChannelUpdateEvent(Event: TChannelUpdateEvent);
+    procedure RegisterClientConnectEvent(Event: TClientConnectedEvent);
+    procedure RegisterClientDisconnectEvent(Event: TClientDisconnectedEvent);
+    procedure RegisterClientMoveEvent(Event: TClientMoveEvent);
     procedure UnregisterUpdateEvent(Event: TClientUpdateEvent);
     procedure UnregisterUpdateEvent(Event: TServerUpdateEvent);
     procedure UnregisterUpdateEvent(Event: TChannelUpdateEvent);
+    procedure UnregisterConnectedEvent(Event: TClientConnectedEvent);
+    procedure UnregisterDisconnectedEvent(Event: TClientDisconnectedEvent);
+    procedure UnregisterMoveEvent(Event: TClientMoveEvent);
     property Config: TConfig read GetConfig;
     property AutoRestart: boolean read FAutoRestart write SetAutoRestart;
     property IdleToTerminate: boolean read FIdleToTerminate write FIdleToTerminate;
@@ -132,7 +154,7 @@ type
 
 implementation
 
-uses TsBot.AfkModule;
+uses TsBot.AfkModule, TsBot.AnounceModule;
 
 { TTBCore }
 
@@ -182,7 +204,7 @@ var
   c: TCommandEventData;
   s: boolean;
   str: string;
-  i: Integer;
+  i: integer;
   m: TBotModule;
 begin
   EnterCriticalsection(CommandCS);
@@ -243,8 +265,8 @@ begin
               Add(Format('Username: %s', [FConfig.Username]));
               Add(Format('Password: %s', [FConfig.Password]));
               Add(Format('Status: %s',
-                [ifThen(Assigned(FConnection) and FConnection.Connected, 'Connected',
-                'Not Connected')]));
+                [ifThen(Assigned(FConnection) and FConnection.Connected,
+                'Connected', 'Not Connected')]));
             end;
             s := True
           finally
@@ -277,7 +299,8 @@ begin
         begin
           EnterCriticalsection(ConfigCS);
           try
-            TStringList(c.Data).Add(Format('%d commands per %d seconds', [FConfig.FloodCommands, FConfig.FloodTime]));
+            TStringList(c.Data).Add(Format('%d commands per %d seconds',
+              [FConfig.FloodCommands, FConfig.FloodTime]));
             s := True
           finally
             LeaveCriticalsection(ConfigCS);
@@ -296,48 +319,49 @@ begin
           end;
         ctModuleList:
         begin
-          for i:=0 to Modules.Count-1 do
-            TStringList(c.Data).Add(Modules[i].Name + ' Active: '+BoolToStr(Modules[i].Enabled, True));
+          for i := 0 to Modules.Count - 1 do
+            TStringList(c.Data).Add(Modules[i].Name +
+              ' Active: ' + BoolToStr(Modules[i].Enabled, True));
           s := True;
         end;
         ctGetModuleConfig:
         begin
-          m:=FindModule(TStringList(c.Data)[0]);
+          m := FindModule(TStringList(c.Data)[0]);
           TStringList(c.Data).Clear;
-          s:=Assigned(m);
+          s := Assigned(m);
           if s then
             m.GetConfig(TStringList(c.Data))
           else
             WriteError(1295, 'Module not found');
         end;
         ctEnableModule:
-        try
-          m:=FindModule(PString(c.Data)^);
-          s:=Assigned(m);
-          if s then
-            m.Enabled:=True
-          else
-            WriteError(1295, 'Module not found');
-        finally
-          Dispose(PString(c.Data));
-        end;
+          try
+            m := FindModule(PString(c.Data)^);
+            s := Assigned(m);
+            if s then
+              m.Enabled := True
+            else
+              WriteError(1295, 'Module not found');
+          finally
+            Dispose(PString(c.Data));
+          end;
         ctDisableModule:
-        try
-          m:=FindModule(PString(c.Data)^);
-          s:=Assigned(m);
-          if s then
-            m.Enabled:=False
-          else
-            WriteError(1295, 'Module not found');
-        finally
-          Dispose(PString(c.Data));
-        end;
+          try
+            m := FindModule(PString(c.Data)^);
+            s := Assigned(m);
+            if s then
+              m.Enabled := False
+            else
+              WriteError(1295, 'Module not found');
+          finally
+            Dispose(PString(c.Data));
+          end;
         ctGetModuleConfData:
         begin
-          str:=TStringList(c.Data)[0];
-          m:=FindModule(str);
+          str := TStringList(c.Data)[0];
+          m := FindModule(str);
           TStringList(c.Data).Clear;
-          s:=Assigned(m);
+          s := Assigned(m);
           if s then
           begin
             m.GetConfigItems(TStringList(c.Data));
@@ -348,11 +372,11 @@ begin
         end;
         ctConfigModule:
         begin
-          m:=FindModule(TStringList(c.Data)[0]);
+          m := FindModule(TStringList(c.Data)[0]);
           TStringList(c.Data).Delete(0);
-          s:=Assigned(m);
+          s := Assigned(m);
           if s then
-            s:=m.ConfigModule(TStringList(c.Data))
+            s := m.ConfigModule(TStringList(c.Data))
           else
             WriteError(1295, 'Module not found');
         end;
@@ -375,24 +399,24 @@ begin
   end;
 end;
 
-procedure TTBCore.RunSchedules(Time: Int64);
+procedure TTBCore.RunSchedules(Time: int64);
 var
   s: TScheduleInfo;
-  i: Integer;
+  i: integer;
 begin
   EnterCriticalsection(ScheduleCS);
   try
-    for i:=0 to FSchedules.Size -1 do
+    for i := 0 to FSchedules.Size - 1 do
     begin
-      s:=FSchedules[i];
+      s := FSchedules[i];
       s.Remaining := s.Remaining - Time;
-      if s.Remaining<=0 then
+      if s.Remaining <= 0 then
       begin
         if Assigned(s.Code) then
           s.Code(Self, s.Data);
-        s.Remaining:=s.Time;
+        s.Remaining := s.Time;
       end;
-      FSchedules[i]:=s;
+      FSchedules[i] := s;
     end;
   finally
     LeaveCriticalsection(ScheduleCS);
@@ -401,25 +425,50 @@ end;
 
 procedure TTBCore.ChannelUpdated(Sender: TObject; Channel: TTsChannel);
 var
-  i: Integer;
+  i: integer;
 begin
-  for i:=0 to ChannelUpdateEvents.Count-1 do
+  for i := 0 to ChannelUpdateEvents.Count - 1 do
     ChannelUpdateEvents[i](Sender, Channel);
+end;
+
+procedure TTBCore.ClientConnected(Sender: TObject; Client: TTsClient);
+var
+  i: integer;
+begin
+  for i := 0 to ClientConnectEvents.Count - 1 do
+    ClientConnectEvents[i](Sender, Client);
+end;
+
+procedure TTBCore.ClientDisconnected(Sender: TObject; Client: TTsClient);
+var
+  i: integer;
+begin
+  for i := 0 to ClientDisconnectEvents.Count - 1 do
+    ClientDisconnectEvents[i](Sender, Client);
+end;
+
+procedure TTBCore.ClientMoved(Sender: TObject; Client: TTsClient;
+  Source, Target: TTsChannel);
+var
+  i: integer;
+begin
+  for i := 0 to ClientMoveEvents.Count - 1 do
+    ClientMoveEvents[i](Sender, Client, Source, Target);
 end;
 
 procedure TTBCore.ClientUpdated(Sender: TObject; Client: TTsClient);
 var
-  i: Integer;
+  i: integer;
 begin
-  for i:=0 to ClientUpdateEvents.Count-1 do
+  for i := 0 to ClientUpdateEvents.Count - 1 do
     ClientUpdateEvents[i](Sender, Client);
 end;
 
 procedure TTBCore.ServerUpdated(Sender: TObject);
 var
-  i: Integer;
+  i: integer;
 begin
-  for i:=0 to ServerUpdateEvents.Count-1 do
+  for i := 0 to ServerUpdateEvents.Count - 1 do
     ServerUpdateEvents[i](Sender);
 end;
 
@@ -444,6 +493,12 @@ procedure TTBCore.CleanUp;
 begin
   if Assigned(FConnection) then
   begin
+    EnterCriticalsection(ScheduleCS);
+    try
+      FSchedules.Clear;
+    finally
+      LeaveCriticalsection(ScheduleCS);
+    end;
     FreeAndNil(FNotificationManager);
     FConnection.LogOut;
     FConnection.Disconnect();
@@ -463,9 +518,16 @@ begin
     FServer.UpdateChannelList(FullChannelUpdate);
     WriteStatus('Requesting clientlist');
     FServer.UpdateClientList(FullClientUpdate);
-    FServer.OnChannelUpdate:=@ChannelUpdated;
-    FServer.OnClientUpdate:=@ClientUpdated;
-    FServer.OnUpdate:=@ServerUpdated;
+    WriteStatus('Requesting servergroups');
+    //FServer.UpdateServerGroups;
+    WriteStatus('Requesting channelgroups');
+    //FServer.UpdateChannelGroups;
+    FServer.OnChannelUpdate := @ChannelUpdated;
+    FServer.OnClientUpdate := @ClientUpdated;
+    FServer.OnUpdate := @ServerUpdated;
+    FServer.OnClientMove := @ClientMoved;
+    FServer.OnClientConnect := @ClientConnected;
+    FServer.OnClientDisconnect := @ClientDisconnected;
 
     // Adding schedules
     if Config.UpdateServerData >= 0 then
@@ -474,6 +536,13 @@ begin
       RegisterSchedule(Config.UpdateChannelList, @UpdateChannels);
     if Config.UpdateClientList >= 0 then
       RegisterSchedule(Config.UpdateClientList, @UpdateClients);
+    if Config.UpdateServerGroups >= 0 then
+      RegisterSchedule(Config.UpdateServerGroups, @UpdateServerGroups);
+    if Config.UpdateChannelGroups >= 0 then
+      RegisterSchedule(Config.UpdateChannelGroups, @UpdateChannelGroups);
+
+    // save config every 30 minutes
+    RegisterSchedule(Minutes30, @SaveConfig);
 
     InitModules();
 
@@ -553,72 +622,119 @@ begin
       end;
     end;
   finally
-    EnterCriticalsection(ConfigCS);
-    try
-      WriteConfig(FConfigPath, FConfig, @SaveModuleConfig);
-    finally
-      LeaveCriticalsection(ConfigCS);
-    end;
+    SaveConfig(Self, 0);
+  end;
+end;
+
+procedure TTBCore.UpdateChannelGroups(Sender: TObject; Data: IntPtr);
+begin
+  try
+    FServer.UpdateChannelGroups;
+  except
+    on E: EChannelDataException do ;
   end;
 end;
 
 procedure TTBCore.UpdateChannels(Sender: TObject; Data: IntPtr);
 begin
-  FServer.UpdateChannelList;
+  try
+    FServer.UpdateChannelList;
+  except
+    on E: EChannelDataException do ;
+  end;
 end;
 
 procedure TTBCore.UpdateClients(Sender: TObject; Data: IntPtr);
 begin
-  FServer.UpdateClientList;
+  try
+    FServer.UpdateClientList;
+  except
+    on E: EClientDataException do ;
+  end;
 end;
 
 procedure TTBCore.UpdateServer(Sender: TObject; Data: IntPtr);
 begin
-  FServer.UpdateServerData;
+  try
+    FServer.UpdateServerData;
+  except
+    on E: EServerDataException do ;
+  end;
+end;
+
+procedure TTBCore.SaveConfig(Sender: TObject; Data: IntPtr);
+begin
+  EnterCriticalsection(ConfigCS);
+  try
+    try
+      WriteConfig(FConfigPath, FConfig, @SaveModuleConfig);
+      WriteStatus('Configuration successfully saved');
+
+    except
+      on e: Exception do
+        WriteError(IConfigWriteError, e.Message);
+    end;
+  finally
+    LeaveCriticalsection(ConfigCS);
+  end;
 end;
 
 procedure TTBCore.RegisterModules;
 begin
   Modules.Add(TAfkModule.Create(Self));
+  Modules.Add(TAnnouncementModule.Create(Self));
 end;
 
 procedure TTBCore.InitModules;
-var i: Integer;
+var
+  i: integer;
 begin
-  for i:=0 to Modules.Count-1 do
+  for i := 0 to Modules.Count - 1 do
     Modules[i].InitModule;
 end;
 
 procedure TTBCore.DoneModules;
-var i: Integer;
+var
+  i: integer;
 begin
-  for i:=0 to Modules.Count-1 do
+  for i := 0 to Modules.Count - 1 do
     Modules[i].DoneModule;
 end;
 
 procedure TTBCore.LoadModuleConfig(Doc: TXMLDocument);
-var i: Integer;
+var
+  i: integer;
 begin
-  for i:=0 to Modules.Count-1 do
+  for i := 0 to Modules.Count - 1 do
     Modules[i].ReadConfig(Doc);
 end;
 
 procedure TTBCore.SaveModuleConfig(Doc: TXMLDocument);
-var i: Integer;
+var
+  i: integer;
 begin
-  for i:=0 to Modules.Count-1 do
+  for i := 0 to Modules.Count - 1 do
     Modules[i].WriteConfig(Doc);
 end;
 
-function TTBCore.FindModule(Name: String): TBotModule;
-var
-  i: Integer;
+procedure TTBCore.UpdateServerGroups(Sender: TObject; Data: IntPtr);
 begin
-  Result:=nil;
-  for i:=0 to Modules.Count-1 do
-    if Modules[i].Name=Name then
+  try
+    FServer.UpdateServerGroups;
+  except
+    on E: EServerDataException do ;
+  end;
+end;
+
+function TTBCore.FindModule(Name: string): TBotModule;
+var
+  i: integer;
+begin
+  Result := nil;
+  for i := 0 to Modules.Count - 1 do
+    if Modules[i].Name = Name then
     begin
-      Result:=Modules[i];
+      Result := Modules[i];
       break;
     end;
 end;
@@ -633,32 +749,32 @@ begin
   end;
 end;
 
-procedure TTBCore.RegisterSchedule(Time: Int64; Code: TDataEvent; Data: Integer
-  );
-var s: TScheduleInfo;
+procedure TTBCore.RegisterSchedule(Time: int64; Code: TDataEvent; Data: integer);
+var
+  s: TScheduleInfo;
 begin
   EnterCriticalsection(ScheduleCS);
   try
-    s.Code:=Code;
-    s.Time:=Time;
-    s.Remaining:=Time;
-    s.Data:=Data;
+    s.Code := Code;
+    s.Time := Time;
+    s.Remaining := Time;
+    s.Data := Data;
     FSchedules.PushBack(s);
   finally
     LeaveCriticalsection(ScheduleCS);
   end;
 end;
 
-procedure TTBCore.RemoveSchedule(Code: TDataEvent; Data: Integer);
+procedure TTBCore.RemoveSchedule(Code: TDataEvent; Data: integer);
 var
-  i: Integer;
+  i: integer;
   s: TScheduleInfo;
 begin
   EnterCriticalsection(ScheduleCS);
   try
-    for i:=0 to FSchedules.Size-1 do
+    for i := 0 to FSchedules.Size - 1 do
     begin
-      s:=FSchedules[i];
+      s := FSchedules[i];
       if (s.Code = Code) and (s.Data = Data) then
       begin
         FSchedules.Erase(i);
@@ -703,13 +819,16 @@ begin
   DoRestart := True;
   FCommandList := TCommandList.Create;
   FIdleToTerminate := AIdleToTerminate;
-  FSchedules:=TSchedules.Create;
-  Modules:=TModuleList.Create(True);
-  ServerUpdateEvents:=TServerUpdateEventList.Create;
-  ClientUpdateEvents:=TClientUpdateEventList.Create;
-  ChannelUpdateEvents:=TChannelUpdateEventList.Create;
-  FClientUpdate:=[];
-  FChannelUpdate:=[];
+  FSchedules := TSchedules.Create;
+  Modules := TModuleList.Create(True);
+  ChannelUpdateEvents := TChannelUpdateEventList.Create;
+  ClientUpdateEvents := TClientUpdateEventList.Create;
+  ChannelUpdateEvents := TChannelUpdateEventList.Create;
+  ClientMoveEvents := TClientMoveEventList.Create;
+  ClientConnectEvents := TClientConnectedEventList.Create;
+  ClientDisconnectEvents := TClientDisconnectedEventList.Create;
+  FClientUpdate := [];
+  FChannelUpdate := [];
   inherited Create(False);
 end;
 
@@ -723,28 +842,49 @@ begin
   FSchedules.Free;
   FCommandList.Free;
   Modules.Free;
-  ServerUpdateEvents.Free;
+  ChannelUpdateEvents.Free;
   ClientUpdateEvents.Free;
   ChannelUpdateEvents.Free;
+  ClientMoveEvents.Free;
+  ClientConnectEvents.Free;
+  ClientDisconnectEvents.Free;
   inherited Destroy;
 end;
 
 procedure TTBCore.RegisterClientUpdateEvent(Event: TClientUpdateEvent);
 begin
-  if ClientUpdateEvents.IndexOf(Event)<0 then
+  if ClientUpdateEvents.IndexOf(Event) < 0 then
     ClientUpdateEvents.Add(Event);
 end;
 
 procedure TTBCore.RegisterServerUpdateEvent(Event: TServerUpdateEvent);
 begin
-  if ServerUpdateEvents.IndexOf(Event)<0 then
+  if ServerUpdateEvents.IndexOf(Event) < 0 then
     ServerUpdateEvents.Add(Event);
 end;
 
 procedure TTBCore.RegisterChannelUpdateEvent(Event: TChannelUpdateEvent);
 begin
-  if ChannelUpdateEvents.IndexOf(Event)<0 then
+  if ChannelUpdateEvents.IndexOf(Event) < 0 then
     ChannelUpdateEvents.Add(Event);
+end;
+
+procedure TTBCore.RegisterClientConnectEvent(Event: TClientConnectedEvent);
+begin
+  if ClientConnectEvents.IndexOf(Event) < 0 then
+    ClientConnectEvents.Add(Event);
+end;
+
+procedure TTBCore.RegisterClientDisconnectEvent(Event: TClientDisconnectedEvent);
+begin
+  if ClientDisconnectEvents.IndexOf(Event) < 0 then
+    ClientDisconnectEvents.Add(Event);
+end;
+
+procedure TTBCore.RegisterClientMoveEvent(Event: TClientMoveEvent);
+begin
+  if ClientMoveEvents.IndexOf(Event) < 0 then
+    ClientMoveEvents.Add(Event);
 end;
 
 procedure TTBCore.UnregisterUpdateEvent(Event: TClientUpdateEvent);
@@ -760,6 +900,21 @@ end;
 procedure TTBCore.UnregisterUpdateEvent(Event: TChannelUpdateEvent);
 begin
   ChannelUpdateEvents.Remove(Event);
+end;
+
+procedure TTBCore.UnregisterConnectedEvent(Event: TClientConnectedEvent);
+begin
+  ClientConnectEvents.Remove(Event);
+end;
+
+procedure TTBCore.UnregisterDisconnectedEvent(Event: TClientDisconnectedEvent);
+begin
+  ClientDisconnectEvents.Remove(Event);
+end;
+
+procedure TTBCore.UnregisterMoveEvent(Event: TClientMoveEvent);
+begin
+  ClientMoveEvents.Remove(Event);
 end;
 
 end.

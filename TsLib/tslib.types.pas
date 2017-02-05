@@ -10,6 +10,40 @@ uses
 
 type
 
+  {$Region Groups}
+
+  TServerGroup = record
+    ID: Integer;
+    Name: String;
+    GroupType: Integer;
+    IconID: Integer;
+    SaveDB: Boolean;
+    SortID: Integer;
+    NameMode: Integer;
+    ModifyP: Integer;
+    MemberAddP: Integer;
+    MemberRemoveP: Integer;
+  end;
+
+  TServerGroupList = specialize TVector<TServerGroup>;
+
+  TChannelGroup = record
+    ID: Integer;
+    Name: String;
+    GroupType: Integer;
+    IconID: Integer;
+    SaveDB: Boolean;
+    SortID: Integer;
+    NameMode: Integer;
+    ModifyP: Integer;
+    MemberAddP: Integer;
+    MemberRemoveP: Integer;
+  end;
+
+  TChannelGroupList = specialize TVector<TChannelGroup>;
+
+  {$EndRegion}
+
   {$Region Server Types}
 
   TOperatingSystem = (osLinux, osWindows, osMacOS, osOther);
@@ -270,6 +304,10 @@ procedure SetConnectionData(AName: String; Value: String; var Connection: TConne
 
 operator := (Str: string) Channel: TChannelData;
 procedure SetChannelData(AName: String; Value: String; var Channel: TChannelData);
+
+operator := (Str: string) Group: TServerGroup;
+operator := (Str: string) Group: TChannelGroup;
+procedure SetGroupData(AName: String; Value: String; var Group: TServerGroup);
 
 function GetNotificationType(Str: string): TNotificationType;
 
@@ -750,6 +788,74 @@ begin
       ReadValue(Value, Clients)
     else if AName = 'channel_needed_subscribe_power' then
       ReadValue(Value, SubscribePower);
+end;
+
+
+operator := (Str: string) Group: TServerGroup;
+var
+  sl: TStringList;
+  i: Integer;
+begin
+  Finalize(Group);
+  FillByte(Group, SizeOf(Group), 0);
+  sl := TStringList.Create;
+  try
+    sl.Delimiter := ' ';
+    sl.StrictDelimiter := True;
+    sl.DelimitedText := Str;
+    for i:=0 to sl.Count-1 do
+      if sl.Names[i]='' then
+        SetGroupData(sl[i], '', Group)
+      else
+        SetGroupData(sl.Names[i], sl.ValueFromIndex[i], Group);
+  finally
+    sl.Free;
+  end;
+end;
+
+operator := (Str: string) Group: TChannelGroup;
+var
+  sl: TStringList;
+  i: Integer;
+begin
+  Finalize(Group);
+  FillByte(Group, SizeOf(Group), 0);
+  sl := TStringList.Create;
+  try
+    sl.Delimiter := ' ';
+    sl.StrictDelimiter := True;
+    sl.DelimitedText := Str;
+    for i:=0 to sl.Count-1 do
+      if sl.Names[i]='' then
+        SetGroupData(sl[i], '', TServerGroup(Group))
+      else
+        SetGroupData(sl.Names[i], sl.ValueFromIndex[i], TServerGroup(Group));
+  finally
+    sl.Free;
+  end;
+end;
+
+procedure SetGroupData(AName: String; Value: String; var Group: TServerGroup);
+begin
+  with Group do
+    if (AName = 'sgid') or (AName = 'cgid')then
+      ReadValue(Value, ID)
+    else if AName = 'name' then
+      ReadValue(Value, Name)
+    else if AName = 'iconid' then
+      ReadValue(Value, IconID)
+    else if AName = 'savedb' then
+      ReadValue(Value, SaveDB)
+    else if AName = 'sortid' then
+      ReadValue(Value, SortID)
+    else if AName = 'namemode' then
+      ReadValue(Value, NameMode)
+    else if AName = 'n_modifyp' then
+      ReadValue(Value, ModifyP)
+    else if AName = 'n_member_addp' then
+      ReadValue(Value, MemberAddP)
+    else if AName = 'n_member_removep' then
+      ReadValue(Value, MemberRemoveP);
 end;
 
 function GetNotificationType(Str: string): TNotificationType;

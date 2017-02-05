@@ -18,10 +18,17 @@ type
   TServerUpdateEvent = TNotifyEvent;
   TChannelUpdateEvent = procedure(Sender: TObject; Channel: TTsChannel) of object;
   TClientUpdateEvent = procedure(Sender: TObject; Client: TTsClient) of object;
+  TClientConnectedEvent = procedure(Sender: TObject; Client: TTsClient) of object;
+  TClientDisconnectedEvent = procedure(Sender: TObject; Client: TTsClient) of object;
+  TClientMoveEvent = procedure(Sender: TObject; Client: TTsClient;
+    Source, Target: TTsChannel) of object;
 
   TServerUpdateEventList = specialize TFPGList<TServerUpdateEvent>;
   TChannelUpdateEventList = specialize TFPGList<TChannelUpdateEvent>;
   TClientUpdateEventList = specialize TFPGList<TClientUpdateEvent>;
+  TClientConnectedEventList = specialize TFPGList<TClientConnectedEvent>;
+  TClientDisconnectedEventList = specialize TFPGList<TClientDisconnectedEvent>;
+  TClientMoveEventList = specialize TFPGList<TClientMoveEvent>;
 
   { Lists }
 
@@ -61,6 +68,9 @@ type
       DataString: string = '');
     destructor Destroy; override;
 
+    procedure SendMessage(Message: string);
+    procedure PokeMessage(Message: string);
+
     property Connection: TTsConnection read FConnection write FConnection;
     property OnUpdate: TNotifyEvent read FOnUpdate write FOnUpdate;
     property Tag: IntPtr read FTag write FTag;
@@ -86,6 +96,7 @@ type
     FFlag: boolean;
     procedure EnableNotifications(AEnable: boolean);
     function GetParent: TTsChannel;
+    function GetPath: String;
     procedure SetParent(AValue: TTsChannel);
   protected
     procedure OnDescriptionNotification(Sender: TObject; ChannelID: integer);
@@ -99,6 +110,7 @@ type
     procedure UpdateChannelData;
 
     procedure ReadChannelData(Data: string);
+    procedure SendMessage(Message: string);
 
     property Connection: TTsConnection read FConnection write FConnection;
     property NotificationManager: TNotificationManager
@@ -113,6 +125,7 @@ type
     property Clients: TTsClientList read FClients;
     property Channels: TTsChannelList read FChannels;
     property Parent: TTsChannel read GetParent write SetParent;
+    property Path: String read GetPath;
   end;
 
   { TTsServer }
@@ -121,6 +134,9 @@ type
   private
     FOnChannelUpdate: TChannelUpdateEvent;
     FOnClientUpdate: TClientUpdateEvent;
+    FOnClientConnect: TClientConnectedEvent;
+    FOnClientDisconnect: TClientDisconnectedEvent;
+    FOnClientMove: TClientMoveEvent;
     FServerData: TServerData;
     FChannels: TTsChannelList;
     FClients: TTsClientList;
@@ -129,8 +145,14 @@ type
     FConnection: TTsConnection;
     FEnableNotifications: boolean;
     FTag: IntPtr;
+    FServerGroups: TServerGroupList;
+    FChannelGroups: TChannelGroupList;
     FOnUpdate: TServerUpdateEvent;
     procedure EnableNotifications(AEnable: boolean);
+    function GetChannelGroup(Index: Integer): TChannelGroup;
+    function GetChannelGroupCount: Integer;
+    function GetServerGroup(Index: Integer): TServerGroup;
+    function GetServerGroupCount: Integer;
   protected
     procedure ChannelUpdated(Sender: TObject);
     procedure ClientUpdated(Sender: TObject);
@@ -147,11 +169,23 @@ type
     procedure UpdateClientList(UpdateData: TClientUpdates = DefaultClientUpdate);
     procedure UpdateChannelList(UpdateData: TChannelUpdates = DefaultChannelUpdate);
     procedure UpdateServerData;
+    procedure UpdateServerGroups;
+    procedure UpdateChannelGroups;
 
     function IndexOfChannel(ChannelID: integer): integer;
     function IndexOfChannel(ChannelName: string): integer;
     function GetChannelByID(CID: integer): TTsChannel;
     function GetChannelByName(Name: string): TTsChannel;
+
+    function IndexOfServerGroup(ID: Integer): Integer;
+    function IndexOfServerGroup(Name: String): Integer;
+    function GetServerGroupByID(ID: Integer): TServerGroup;
+    function GetServerGroupByName(Name: String): TServerGroup;
+
+    function IndexOfChannelGroup(ID: Integer): Integer;
+    function IndexOfChannelGroup(Name: String): Integer;
+    function GetChannelGroupByID(ID: Integer): TChannelGroup;
+    function GetChannelGroupByName(Name: String): TChannelGroup;
 
     function IndexOfClientUID(UID: string): integer;
     function IndexOfClient(ClientID: integer): integer;
@@ -166,6 +200,11 @@ type
     function SendPrivateMessage(Message: string; ClientID: integer): boolean;
     function SendChannelMessage(Message: string; ChannelID: integer): boolean;
     function SendServerMessage(Message: string): boolean;
+    function PokeClient(Message: string; ClientID: integer): boolean;
+
+    function ResolveChannelPath(Path: String): TTsChannel;
+    function GetChannelPath(Channel: TTsChannel): String;
+    function GetChannelPath(ChannelID: Integer): String;
 
     property Connection: TTsConnection read FConnection write FConnection;
     property NotificationManager: TNotificationManager
@@ -173,12 +212,24 @@ type
     property UseNotifications: boolean read FEnableNotifications
       write EnableNotifications;
     property ServerData: TServerData read FServerData;
+    property Channels: TTsChannelList read FChannels;
+    property Clients: TTsClientList read FClients;
+    property ChannelTree: TTsChannelList read FChannelTree;
     property Tag: IntPtr read FTag write FTag;
     property OnUpdate: TServerUpdateEvent read FOnUpdate write FOnUpdate;
     property OnClientUpdate: TClientUpdateEvent
       read FOnClientUpdate write FOnClientUpdate;
     property OnChannelUpdate: TChannelUpdateEvent
       read FOnChannelUpdate write FOnChannelUpdate;
+    property OnClientConnect: TClientConnectedEvent
+      read FOnClientConnect write FOnClientConnect;
+    property OnClientDisconnect: TClientDisconnectedEvent
+      read FOnClientDisconnect write FOnClientDisconnect;
+    property OnClientMove: TClientMoveEvent read FOnClientMove write FOnClientMove;
+    property ServerGroup[Index: Integer]: TServerGroup read GetServerGroup;
+    property ServerGroupCount: Integer read GetServerGroupCount;
+    property ChannelGroup[Index: Integer]: TChannelGroup read GetChannelGroup;
+    property ChannelGroupCount: Integer read GetChannelGroupCount;
   end;
 
 implementation
@@ -197,6 +248,24 @@ end;
 destructor TTsClient.Destroy;
 begin
   inherited Destroy;
+end;
+
+procedure TTsClient.SendMessage(Message: string);
+begin
+  try
+    FServer.SendPrivateMessage(Message, ClientData.ID);
+  except
+    on e: EMessageException do ;
+  end;
+end;
+
+procedure TTsClient.PokeMessage(Message: string);
+begin
+  try
+    FServer.PokeClient(Message, ClientData.ID);
+  except
+    on e: EMessageException do ;
+  end;
 end;
 
 procedure TTsClient.MoveToChannel(Dest: TTsChannel);
@@ -278,6 +347,11 @@ end;
 function TTsChannel.GetParent: TTsChannel;
 begin
   Result := FServer.GetChannelByID(ChannelData.ParentID);
+end;
+
+function TTsChannel.GetPath: String;
+begin
+  Result:=FServer.GetChannelPath(Self);
 end;
 
 procedure TTsChannel.SetParent(AValue: TTsChannel);
@@ -375,6 +449,15 @@ begin
     FOnUpdate(Self);
 end;
 
+procedure TTsChannel.SendMessage(Message: string);
+begin
+  try
+    FServer.SendChannelMessage(Message, FChannelData.ID);
+  except
+    on e: EMessageException do ;
+  end;
+end;
+
 { TTsServer }
 
 procedure TTsServer.EnableNotifications(AEnable: boolean);
@@ -408,6 +491,26 @@ begin
   FEnableNotifications := AEnable;
 end;
 
+function TTsServer.GetChannelGroup(Index: Integer): TChannelGroup;
+begin
+  Result:=FChannelGroups[Index];
+end;
+
+function TTsServer.GetChannelGroupCount: Integer;
+begin
+  Result:=FServerGroups.Size;
+end;
+
+function TTsServer.GetServerGroup(Index: Integer): TServerGroup;
+begin
+  Result:=FServerGroups[Index];
+end;
+
+function TTsServer.GetServerGroupCount: Integer;
+begin
+  Result:=FChannelGroups.Size;
+end;
+
 procedure TTsServer.ChannelUpdated(Sender: TObject);
 begin
   if Assigned(FOnChannelUpdate) then
@@ -422,13 +525,34 @@ end;
 
 procedure TTsServer.OnConnectNotification(Sender: TObject;
   AData: TClientConnectNotification);
+var
+  i: integer;
+  c: TTsChannel;
 begin
-  { TODO : Handle connects }
+  i := FClients.Add(TTsClient.Create(Self, FConnection));
+  FClients[i].FClientData := AData.Client;
+  c := GetChannelByID(AData.ChannelTargetID);
+  if Assigned(c) then
+    c.Clients.Add(FClients[i]);
+  if Assigned(FOnClientConnect) then
+    FOnClientConnect(Self, FClients[i]);
 end;
 
 procedure TTsServer.OnDCNotification(Sender: TObject; AData: TClientDCNotification);
+var
+  i: integer;
+  c: TTsChannel;
 begin
-  { TODO : Handle Disconnects }
+  i := IndexOfClient(AData.ClientID);
+  c := GetChannelByID(AData.ChannelID);
+  if i >= 0 then
+  begin
+    if Assigned(c) then
+      c.Clients.Remove(FClients[i]);
+    if Assigned(FOnClientDisconnect) then
+      FOnClientDisconnect(Self, FClients[i]);
+    FClients.Delete(i);
+  end;
 end;
 
 procedure TTsServer.OnEditNotification(Sender: TObject; AData: TServerEditNotification);
@@ -444,8 +568,24 @@ begin
 end;
 
 procedure TTsServer.OnMoveNotification(Sender: TObject; AData: TClientMoveNotification);
+var
+  c: TTsClient;
+  d: TClientData;
+  f, t: TTsChannel;
 begin
-  { TODO : Handle Moves }
+  c := GetClientByID(AData.ClientID);
+  if not Assigned(c) then
+    exit;
+  d := c.ClientData;
+  d.ChannelID := AData.ChannelTargetID;
+  // origin channel
+  f := c.Channel;
+  // update channel
+  c.FClientData := d;
+  // target channel
+  t := c.Channel;
+  if Assigned(f) and Assigned(t) and (f <> t) and Assigned(FOnClientMove) then
+    FOnClientMove(Self, c, f, t);
 end;
 
 constructor TTsServer.Create(AConnection: TTsConnection;
@@ -456,6 +596,8 @@ begin
   FChannels := TTsChannelList.Create(True);
   FChannelTree := TTsChannelList.Create(False);
   FClients := TTsClientList.Create(True);
+  FServerGroups:=TServerGroupList.Create;
+  FChannelGroups:=TChannelGroupList.Create;
   FEnableNotifications := False;
 end;
 
@@ -679,6 +821,72 @@ begin
   FServerData := SDString;
 end;
 
+procedure TTsServer.UpdateServerGroups;
+var
+  Data: String;
+  Res: TStatusResponse;
+  sl: TStringList;
+  g: TServerGroup;
+  i: Integer;
+begin
+  FServerGroups.Clear;
+
+  // Run command
+  Res := FConnection.ExecCommand('servergrouplist', Data);
+  if Res.ErrNo <> 0 then
+  begin
+    WriteError(res.ErrNo, res.Msg);
+    raise EChannelDataException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
+  end;
+
+  sl:=TStringList.Create;
+  try
+    sl.Delimiter:='|';
+    sl.StrictDelimiter:=True;
+    sl.DelimitedText:=Data;
+    for i:=0 to sl.Count -1 do
+    begin
+      g:=sl[i];
+      FServerGroups.PushBack(g);
+    end;
+  finally
+    sl.Free;
+  end;
+end;
+
+procedure TTsServer.UpdateChannelGroups;
+var
+  Data: String;
+  Res: TStatusResponse;
+  sl: TStringList;
+  g: TChannelGroup;
+  i: Integer;
+begin
+  FChannelGroups.Clear;
+
+  // Run command
+  Res := FConnection.ExecCommand('channelgrouplist', Data);
+  if Res.ErrNo <> 0 then
+  begin
+    WriteError(res.ErrNo, res.Msg);
+    raise EChannelDataException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
+  end;
+
+  sl:=TStringList.Create;
+  try
+    sl.Delimiter:='|';
+    sl.StrictDelimiter:=True;
+    sl.DelimitedText:=Data;
+    for i:=0 to sl.Count -1 do
+    begin
+      g:=sl[i];
+      FChannelGroups.PushBack(g);
+    end;
+  finally
+    sl.Free;
+  end;
+end;
+
 function TTsServer.IndexOfChannel(ChannelID: integer): integer;
 var
   i: integer;
@@ -693,17 +901,30 @@ begin
 end;
 
 function TTsServer.IndexOfChannel(ChannelName: string): integer;
+
+function FindChannelDFS(Name: String; List: TTsChannelList): Integer;
 var
   i: integer;
 begin
   Result := -1;
-  ChannelName := LowerCase(ChannelName);
-  for i := 0 to FChannels.Count - 1 do
-    if LowerCase(FChannels[i].ChannelData.Name) = ChannelName then
+  for i := 0 to List.Count - 1 do
+    if LowerCase(List[i].ChannelData.Name) = ChannelName then
     begin
-      Result := i;
-      Break;
+      Result := FChannels.IndexOf(List[i]);
+      Exit;
     end;
+
+  for i:=0 to List.Count-1 do
+  begin
+    Result:=FindChannelDFS(Name, List[i].Channels);
+    if Result>=0 then
+      exit;
+  end;
+end;
+
+begin
+  ChannelName := LowerCase(ChannelName);
+  Result:=FindChannelDFS(ChannelName, FChannelTree);
 end;
 
 function TTsServer.GetChannelByID(CID: integer): TTsChannel;
@@ -726,6 +947,96 @@ begin
     Result := FChannels[idx]
   else
     Result := nil;
+end;
+
+function TTsServer.IndexOfServerGroup(ID: Integer): Integer;
+var
+  i: integer;
+begin
+  Result := -1;
+  for i := 0 to FServerGroups.Size - 1 do
+    if FServerGroups[i].ID = ID then
+    begin
+      Result := i;
+      Break;
+    end;
+end;
+
+function TTsServer.IndexOfServerGroup(Name: String): Integer;
+var
+  i: integer;
+begin
+  Result := -1;
+  for i := 0 to FServerGroups.Size - 1 do
+    if LowerCase(FServerGroups[i].Name) = LowerCase(Name) then
+    begin
+      Result := i;
+      Break;
+    end;
+end;
+
+function TTsServer.GetServerGroupByID(ID: Integer): TServerGroup;
+var
+  idx: integer;
+begin
+  idx := IndexOfServerGroup(ID);
+  if idx >= 0 then
+    Result := FServerGroups[idx];
+end;
+
+function TTsServer.GetServerGroupByName(Name: String): TServerGroup;
+var
+  idx: integer;
+begin
+  Result.ID:=-1;
+  idx := IndexOfServerGroup(Name);
+  if idx >= 0 then
+    Result := FServerGroups[idx];
+end;
+
+function TTsServer.IndexOfChannelGroup(ID: Integer): Integer;
+var
+  i: integer;
+begin
+  Result := -1;
+  for i := 0 to FChannelGroups.Size - 1 do
+    if FChannelGroups[i].ID = ID then
+    begin
+      Result := i;
+      Break;
+    end;
+end;
+
+function TTsServer.IndexOfChannelGroup(Name: String): Integer;
+var
+  i: integer;
+begin
+  Result := -1;
+  for i := 0 to FChannelGroups.Size - 1 do
+    if LowerCase(FChannelGroups[i].Name) = LowerCase(Name) then
+    begin
+      Result := i;
+      Break;
+    end;
+end;
+
+function TTsServer.GetChannelGroupByID(ID: Integer): TChannelGroup;
+var
+  idx: integer;
+begin
+  idx := IndexOfChannelGroup(ID);
+  if idx >= 0 then
+    Result := FChannelGroups[idx];
+end;
+
+function TTsServer.GetChannelGroupByName(Name: String): TChannelGroup;
+var
+  idx: integer;
+begin
+  Result.ID:=-1;
+  idx := IndexOfChannelGroup(Name);
+  if idx >= 0 then
+    Result := FChannelGroups[idx];
 end;
 
 function TTsServer.IndexOfClientUID(UID: string): integer;
@@ -873,6 +1184,96 @@ begin
     WriteError(res.ErrNo, res.Msg);
     raise EMessageException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
   end;
+end;
+
+function TTsServer.PokeClient(Message: string; ClientID: integer): boolean;
+var
+  res: TStatusResponse;
+begin
+  res := FConnection.ExecCommand(Format('clientpoke clid=%d msg=%s',
+    [ClientID, EncodeStr(Message)]));
+  Result := res.ErrNo = 0;
+  if not Result then
+  begin
+    WriteError(res.ErrNo, res.Msg);
+    raise EMessageException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
+  end;
+end;
+
+function TTsServer.ResolveChannelPath(Path: String): TTsChannel;
+var
+  lst: TTsChannelList;
+  i, l: Integer;
+  sl: TStringList;
+  Found: Boolean;
+  c: TTsChannel;
+begin
+  Result:=nil;;
+  sl:=TStringList.Create;
+  try
+    i:=1;
+    l:=0;
+    while i+l<=Length(Path) do
+      if (Path[i+l]='/') and (i+l < Length(Path)) and (Path[i+l+1]<>'/') then
+      begin
+        sl.Add(StringReplace(Copy(Path, i, l), '//', '/', [rfReplaceAll]));
+        inc(i, l+1);
+        l:=0;
+      end
+      else
+        inc(l);
+    // add last
+    if (i<=Length(Path)) and (l>0) then
+        sl.Add(StringReplace(Copy(Path, i, l), '//', '/', [rfReplaceAll]));
+
+    if sl.Count=0 then exit;
+
+    if sl.Count = 1 then
+    begin
+      Result:=GetChannelByName(sl[0]);
+      Exit;
+    end;
+    c:=GetChannelByName(sl[0]);
+    if not Assigned(c) then Exit;
+    lst:=c.Channels;
+    for i:=1 to sl.Count-1 do
+    begin
+      Found:=False;
+      for l:=0 to lst.Count-1 do
+        if LowerCase(lst[l].ChannelData.Name) = LowerCase(sl[i]) then
+        begin
+          if i=sl.Count-1 then
+          begin
+            Result:=lst[l];
+            Exit;
+          end;
+          lst:=lst[l].Channels;
+          Found:=True;
+          Break;
+        end;
+      if not Found then Exit;
+    end;
+  finally
+    sl.Free;
+  end;
+end;
+
+function TTsServer.GetChannelPath(Channel: TTsChannel): String;
+begin
+  if not Assigned(Channel) then
+    exit;
+  Result:=StringReplace(Channel.ChannelData.Name, '/', '//', [rfReplaceAll]);
+  Channel:=Channel.Parent;
+  while Assigned(Channel) do
+  begin
+    Result:=StringReplace(Channel.ChannelData.Name, '/', '//', [rfReplaceAll])+'/'+Result;
+    Channel:=Channel.Parent
+  end;
+end;
+
+function TTsServer.GetChannelPath(ChannelID: Integer): String;
+begin
+  GetChannelPath(GetChannelByID(ChannelID));
 end;
 
 end.

@@ -5,7 +5,7 @@ unit TsBot.config;
 interface
 
 uses
-  Classes, SysUtils, DOM, XMLRead, XMLWrite;
+  Classes, SysUtils, DOM, XMLRead, XMLWrite, TsBot.Utils;
 
 type
   TConfig = record
@@ -15,9 +15,11 @@ type
     Port: integer;
     ServerID: integer;
     LogPath: string;
-    UpdateServerData: Integer;
-    UpdateChannelList: Integer;
-    UpdateClientList: Integer;
+    UpdateServerData: Int64;
+    UpdateChannelList: Int64;
+    UpdateClientList: Int64;
+    UpdateServerGroups: Int64;
+    UpdateChannelGroups: Int64;
     FloodCommands, FloodTime: Integer;
   end;
 
@@ -25,10 +27,11 @@ type
 
 const
   DefaultConf: TConfig = (Username: 'User'; Password: 'Pass';
-    IPAddress: '127.0.0.1'; Port: 10011; ServerID: 1;
+    IPAddress: LoopBackAddr; Port: DefaultPort; ServerID: DefaultServerID;
     LogPath: {$IfDef DEBUG}'./log.txt'{$Else}''{$EndIf};
-    UpdateServerData: -1; UpdateChannelList: 10000;
-    UpdateClientList: 1000; FloodCommands: -1;
+    UpdateServerData: Minutes30; UpdateChannelList: MSPerSec * 10;
+    UpdateClientList: MSPerSec; UpdateServerGroups: Minutes30;
+    UpdateChannelGroups: Minutes30;  FloodCommands: -1;
     FloodTime: -1);
   ConfigVersion = 1;
 
@@ -103,15 +106,23 @@ end;
 
     attr := Node.AttribStrings['ServerData'];
     if IsNumeric(attr) then
-      Result.UpdateServerData := StrToInt(attr);
+      Result.UpdateServerData := StrToInt64(attr);
 
     attr := Node.AttribStrings['Channels'];
     if IsNumeric(attr)then
-      Result.UpdateChannelList := StrToInt(attr);
+      Result.UpdateChannelList := StrToInt64(attr);
 
     attr := Node.AttribStrings['Clients'];
     if IsNumeric(attr) then
-      Result.UpdateClientList := StrToInt(attr);
+      Result.UpdateClientList := StrToInt64(attr);
+
+    attr := Node.AttribStrings['ServerGroups'];
+    if IsNumeric(attr) then
+      Result.UpdateServerGroups := StrToInt64(attr);
+
+    attr := Node.AttribStrings['ChannelGroups'];
+    if IsNumeric(attr) then
+      Result.UpdateChannelGroups := StrToInt64(attr);
   end;
 
   procedure ReadFloodControl(Doc: TXMLDocument);
@@ -190,6 +201,8 @@ begin
     TDOMElement(ParentNode).SetAttribute('ServerData', IntToStr(Config.UpdateServerData));
     TDOMElement(ParentNode).SetAttribute('Channels', IntToStr(Config.UpdateChannelList));
     TDOMElement(ParentNode).SetAttribute('Clients', IntToStr(Config.UpdateClientList));
+    TDOMElement(ParentNode).SetAttribute('ServerGroups', IntToStr(Config.UpdateServerGroups));
+    TDOMElement(ParentNode).SetAttribute('ChannelGroups', IntToStr(Config.UpdateChannelGroups));
 
     // Adding FloodControl info
     ParentNode:=doc.CreateElement('AntiFlood');

@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, TsBot.core, TsLib.connection, TsLib.NotificationManager,
-  TsLib.Types, TsLib.Server, gvector, DOM, Logger;
+  TsLib.Types, TsLib.Server, TsBot.Utils, gvector, DOM, Logger;
 
 type
 
@@ -33,7 +33,7 @@ type
     FDefaultAfkName: string;
     FNotifications: TNotificationManager;
     AfkData: TAfkDataList;
-    function CheckForMove(Client: TTsClient; Data: TAfkData): Boolean;
+    function CheckForMove(Client: TTsClient; Data: TAfkData): boolean;
   protected
     procedure ClientUpdated(Sender: TObject; Client: TTsClient);
     // enable/disable Module
@@ -55,6 +55,8 @@ type
     procedure ReadConfig(doc: TXMLDocument); override;
     procedure WriteConfig(doc: TXMLDocument); override;
 
+    function GetHelp: string; override;
+
     function ConfigModule(Config: TStringList): boolean; override;
     procedure GetConfigItems(Sl: TStringList); override;
     procedure GetConfig(SL: TStringList); override;
@@ -68,54 +70,62 @@ implementation
 
 { TAfkModule }
 
-function TAfkModule.CheckForMove(Client: TTsClient; Data: TAfkData): Boolean;
+function TAfkModule.CheckForMove(Client: TTsClient; Data: TAfkData): boolean;
 begin
-  Result:=False;
+  Result := False;
   with Data do
   begin
-    if IdleTime>=0 then
-      Result := Result or (Client.ClientData.IdleTime>IdleTime);
-    if AwayTime>=0 then
-      Result := Result or ((Client.ClientData.IdleTime>AwayTime) and Client.ClientData.IsAway);
-    if InMutedTime>=0 then
-      Result := Result or ((Client.ClientData.IdleTime>InMutedTime) and Client.ClientData.MutedInput);
-    if OutMutedTime>=0 then
-      Result := Result or ((Client.ClientData.IdleTime>OutMutedTime) and (Client.ClientData.MutedOutput or Client.ClientData.MutedOutputOnly));
+    if IdleTime >= 0 then
+      Result := Result or (Client.ClientData.IdleTime > IdleTime);
+    if AwayTime >= 0 then
+      Result := Result or ((Client.ClientData.IdleTime > AwayTime) and
+        Client.ClientData.IsAway);
+    if InMutedTime >= 0 then
+      Result := Result or ((Client.ClientData.IdleTime > InMutedTime) and
+        Client.ClientData.MutedInput);
+    if OutMutedTime >= 0 then
+      Result := Result or ((Client.ClientData.IdleTime > OutMutedTime) and
+        (Client.ClientData.MutedOutput or Client.ClientData.MutedOutputOnly));
   end;
 end;
 
 procedure TAfkModule.ClientUpdated(Sender: TObject; Client: TTsClient);
 var
   i: integer;
-  tc: Integer;
-  doMove, inAfk: Boolean;
+  tc: integer;
+  c: TTsChannel;
+  doMove, inAfk: boolean;
   d: TAfkData;
 begin
   if not Enabled then
     exit;
   for i := 0 to AfkData.Size - 1 do
   begin
-    d:=AfkData[i];
+    d := AfkData[i];
     with d do
-    if Client.ClientData.UID=UID then
-    begin
-      tc := FServer.GetChannelByName(DestinationChannel).ChannelData.ID;
-      doMove:=CheckForMove(Client, AfkData[i]);
-      inAfk:=(tc = Client.ClientData.ChannelID);
-      if inAfk and (LastChannel>0) and not doMove then //in afk channel but requirement not met
+      if Client.ClientData.UID = UID then
       begin
-        Client.Channel:=FServer.GetChannelByID(LastChannel);
-        LastChannel:=0;
-      end
-      else if not inAfk and doMove then
-      begin
-        LastChannel:=Client.ClientData.ChannelID;
-        Client.Channel:=FServer.GetChannelByID(tc);
-      end
-      else if not inAfk and not doMove then
-        LastChannel:=0;
-    end;
-    AfkData[i]:=d;
+        c := FServer.ResolveChannelPath(DestinationChannel);
+        if not Assigned(c) then
+          Continue;
+        tc := c.ChannelData.ID;
+        doMove := CheckForMove(Client, AfkData[i]);
+        inAfk := (tc = Client.ClientData.ChannelID);
+        if inAfk and (LastChannel > 0) and not doMove then
+          //in afk channel but requirement not met
+        begin
+          Client.Channel := FServer.GetChannelByID(LastChannel);
+          LastChannel := 0;
+        end
+        else if not inAfk and doMove then
+        begin
+          LastChannel := Client.ClientData.ChannelID;
+          Client.Channel := FServer.GetChannelByID(tc);
+        end
+        else if not inAfk and not doMove then
+          LastChannel := 0;
+      end;
+    AfkData[i] := d;
   end;
 end;
 
@@ -136,27 +146,12 @@ end;
 
 procedure TAfkModule.TextMessage(Sender: TObject; AData: TTextNotification);
 
-  function ReadToken(Str: string; var p: integer): string;
-  var
-    len: integer;
+  procedure SetDestinationChannel(var Data: TAfkData; Val: string);
   begin
-    Result := '';
-    len := 0;
-    while (p <= Length(Str)) and (Str[p] in [#1..' ']) do
-      Inc(p);
-    if p > Length(str) then
-      Exit;
-    if Str[p] = '"' then
-    begin
-      Inc(p);
-      while (p + len <= Length(Str)) and (Str[p + len] <> '"') do
-        Inc(len);
-    end
+    if not Assigned(FServer.ResolveChannelPath(Val)) then
+      FServer.SendPrivateMessage('Can''t find the given channel: ' + Val, AData.Invoker.ID)
     else
-      while (p + len <= Length(Str)) and (Ord(Str[p + len]) > Ord(' ')) do
-        Inc(len);
-    Result := Copy(str, p, len);
-    Inc(p, len);
+      Data.DestinationChannel := Val;
   end;
 
 var
@@ -173,7 +168,7 @@ begin
     i := 1;
     while i < Length(AData.Message) do
       sl.Add(ReadToken(AData.Message, i));
-    if sl[0] <> '!afkmove' then
+    if (sl[0] <> '!afkmove') or (sl.Count < 2) then
       exit;
     if sl[1] = 'help' then
     begin
@@ -181,10 +176,23 @@ begin
         '[outputmuted=Time] [away=Time] [channel="channel"]'#10 +
         'Where Time specifies the total count of milliseconds before you get' +
         ' moved. "channel" defines the channel you will be moved to (Default: ' +
-        FDefaultAfkName + ')'#10'if you set Time < 0 this event will be ignored',
+        FDefaultAfkName + ')'#10'if you set Time < 0 this event will be ignored' +
+        #10#10'Example: !afkmove outputmuted=0 away=0 inputmuted=300000'#10 +
+        'This will move you on muting you sound or setting away status directly' +
+        'and after 5 minutes of muted microphone'#10+
+        'Use !afkmove info to get information about your current settings',
         AData.Invoker.ID);
-
-
+      Exit;
+    end
+    else if sl[1] = 'info' then
+    begin
+      for i := 0 to AfkData.Size - 1 do
+        if AfkData[i].UID = AData.Invoker.UID then
+          with AfkData[i] do
+            FServer.SendPrivateMessage(Format('idle=%d away=%d outputmuted=%d ' +
+              'inputmuted=%d channel="%s"', [IdleTime, AwayTime, OutMutedTime,
+              InMutedTime, DestinationChannel]),
+              AData.Invoker.ID);
       Exit;
     end;
 
@@ -210,9 +218,9 @@ begin
       else if LowerCase(sl.Names[i]) = 'away' then
         d.AwayTime := StrToInt(sl.ValueFromIndex[i])
       else if (LowerCase(sl[i]) = 'channel=') and (i < sl.Count - 1) then
-        d.DestinationChannel := sl[i + 1]
+        SetDestinationChannel(d, sl[i + 1])
       else if LowerCase(sl.Names[i]) = 'channel' then
-        d.DestinationChannel := sl.ValueFromIndex[i];
+        SetDestinationChannel(d, sl.ValueFromIndex[i]);
     end;
     if u = -1 then
     begin
@@ -348,18 +356,26 @@ begin
 
 end;
 
+function TAfkModule.GetHelp: string;
+begin
+  Result := 'AFK Move: !afkmove help for more information';
+end;
+
 function TAfkModule.ConfigModule(Config: TStringList): boolean;
 begin
+  if not Assigned(Config) or (Config.Count=0) then exit;
   FDefaultAfkName := Config[0];
 end;
 
 procedure TAfkModule.GetConfigItems(Sl: TStringList);
 begin
+  if not Assigned(sl) then exit;
   sl.Add('Default Afk Channel');
 end;
 
 procedure TAfkModule.GetConfig(SL: TStringList);
 begin
+  if not Assigned(SL) then exit;
   sl.Add('Default Afk Channel: ' + FDefaultAfkName);
 end;
 
