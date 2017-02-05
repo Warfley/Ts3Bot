@@ -22,13 +22,14 @@ const
 
   IConfigWriteError = 52;
 
-function ReadToken(Str: string; var p: integer): string;
+function ReadArgument(Str: string; var p: integer): string;
 
 implementation
 
-function ReadToken(Str: string; var p: integer): string;
+function ReadArgument(Str: string; var p: integer): string;
 var
   len: integer;
+  inStr: Boolean;
 begin
   Result := '';
   len := 0;
@@ -36,16 +37,16 @@ begin
     Inc(p);
   if p > Length(str) then
     Exit;
-  if Str[p] = '"' then
+  inStr:=False;
+  while p+len<=Length(Str) do
   begin
-    Inc(p);
-    while (p + len <= Length(Str)) and (Str[p + len] <> '"') do
-      Inc(len);
-  end
-  else
-    while (p + len <= Length(Str)) and (Str[p + len] in [' '..#255]-[' ','"']) do
-      Inc(len);
-  Result := Copy(str, p, len);
+    case Str[p+Len] of
+    '"': inStr:=not inStr;
+    #0..' ': if not inStr then Break;
+    end;
+    inc(len);
+  end;
+  Result := StringReplace(Copy(str, p, len), '"', '', [rfReplaceAll]);
   Inc(p, len);
 end;
 

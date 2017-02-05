@@ -848,7 +848,7 @@ begin
     sl.DelimitedText:=Data;
     for i:=0 to sl.Count -1 do
     begin
-      g:=sl[i];
+      g:=CreateServerGroup(sl[i]);
       FServerGroups.PushBack(g);
     end;
   finally
@@ -881,7 +881,7 @@ begin
     sl.DelimitedText:=Data;
     for i:=0 to sl.Count -1 do
     begin
-      g:=sl[i];
+      g:=CreateChannelGroup(sl[i]);
       FChannelGroups.PushBack(g);
     end;
   finally

@@ -425,7 +425,19 @@ begin
 end;
 
 procedure TTsConnection.DeleteReciever(Reciever: TRecieveEvent);
+var
+  i: Integer;
 begin
+  // wait at most 5 seconds for semaphore
+  for i:=0 to 50 do
+  begin
+    if FSyncRecievers.LockCount=0 then
+      break;
+    sleep(100);
+  end;
+  if FSyncRecievers.LockCount>0 then
+    Exit;
+
   EnterCriticalsection(FSyncRecievers);
   try
     Recievers.Remove(Reciever);

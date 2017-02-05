@@ -149,7 +149,8 @@ procedure TAfkModule.TextMessage(Sender: TObject; AData: TTextNotification);
   procedure SetDestinationChannel(var Data: TAfkData; Val: string);
   begin
     if not Assigned(FServer.ResolveChannelPath(Val)) then
-      FServer.SendPrivateMessage('Can''t find the given channel: ' + Val, AData.Invoker.ID)
+      FServer.SendPrivateMessage('Can''t find the given channel: ' +
+        Val, AData.Invoker.ID)
     else
       Data.DestinationChannel := Val;
   end;
@@ -167,32 +168,35 @@ begin
   try
     i := 1;
     while i < Length(AData.Message) do
-      sl.Add(ReadToken(AData.Message, i));
-    if (sl[0] <> '!afkmove') or (sl.Count < 2) then
+      sl.Add(ReadArgument(AData.Message, i));
+    if (sl.Count = 0) or (sl[0] <> '!afkmove') then
       exit;
-    if sl[1] = 'help' then
+    if (sl.Count = 1) then
     begin
-      FServer.SendPrivateMessage('!afkmove [idle=Time] [inputmuted=Time] ' +
-        '[outputmuted=Time] [away=Time] [channel="channel"]'#10 +
-        'Where Time specifies the total count of milliseconds before you get' +
-        ' moved. "channel" defines the channel you will be moved to (Default: ' +
-        FDefaultAfkName + ')'#10'if you set Time < 0 this event will be ignored' +
-        #10#10'Example: !afkmove outputmuted=0 away=0 inputmuted=300000'#10 +
-        'This will move you on muting you sound or setting away status directly' +
-        'and after 5 minutes of muted microphone'#10+
-        'Use !afkmove info to get information about your current settings',
-        AData.Invoker.ID);
-      Exit;
-    end
-    else if sl[1] = 'info' then
-    begin
-      for i := 0 to AfkData.Size - 1 do
-        if AfkData[i].UID = AData.Invoker.UID then
-          with AfkData[i] do
-            FServer.SendPrivateMessage(Format('idle=%d away=%d outputmuted=%d ' +
-              'inputmuted=%d channel="%s"', [IdleTime, AwayTime, OutMutedTime,
-              InMutedTime, DestinationChannel]),
-              AData.Invoker.ID);
+      if sl[1] = 'info' then
+      begin
+        for i := 0 to AfkData.Size - 1 do
+          if AfkData[i].UID = AData.Invoker.UID then
+            with AfkData[i] do
+            begin
+              FServer.SendPrivateMessage(Format('idle=%d away=%d outputmuted=%d ' +
+                'inputmuted=%d channel="%s"', [IdleTime, AwayTime,
+                OutMutedTime, InMutedTime, DestinationChannel]),
+                AData.Invoker.ID);
+              break;
+            end;
+      end
+      else
+        FServer.SendPrivateMessage('!afkmove [idle=Time] [inputmuted=Time] ' +
+          '[outputmuted=Time] [away=Time] [channel="channel"]'#10 +
+          'Where Time specifies the total count of milliseconds before you get' +
+          ' moved. "channel" defines the channel you will be moved to (Default: ' +
+          FDefaultAfkName + ')'#10'if you set Time < 0 this event will be ignored' +
+          #10#10'Example: !afkmove outputmuted=0 away=0 inputmuted=300000'#10 +
+          'This will move you on muting you sound or setting away status directly' +
+          'and after 5 minutes of muted microphone'#10 +
+          'Use !afkmove info to get information about your current settings',
+          AData.Invoker.ID);
       Exit;
     end;
 
@@ -217,8 +221,6 @@ begin
         d.OutMutedTime := StrToInt(sl.ValueFromIndex[i])
       else if LowerCase(sl.Names[i]) = 'away' then
         d.AwayTime := StrToInt(sl.ValueFromIndex[i])
-      else if (LowerCase(sl[i]) = 'channel=') and (i < sl.Count - 1) then
-        SetDestinationChannel(d, sl[i + 1])
       else if LowerCase(sl.Names[i]) = 'channel' then
         SetDestinationChannel(d, sl.ValueFromIndex[i]);
     end;
@@ -363,19 +365,22 @@ end;
 
 function TAfkModule.ConfigModule(Config: TStringList): boolean;
 begin
-  if not Assigned(Config) or (Config.Count=0) then exit;
+  if not Assigned(Config) or (Config.Count = 0) then
+    exit;
   FDefaultAfkName := Config[0];
 end;
 
 procedure TAfkModule.GetConfigItems(Sl: TStringList);
 begin
-  if not Assigned(sl) then exit;
+  if not Assigned(sl) then
+    exit;
   sl.Add('Default Afk Channel');
 end;
 
 procedure TAfkModule.GetConfig(SL: TStringList);
 begin
-  if not Assigned(SL) then exit;
+  if not Assigned(SL) then
+    exit;
   sl.Add('Default Afk Channel: ' + FDefaultAfkName);
 end;
 

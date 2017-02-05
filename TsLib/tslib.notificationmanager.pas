@@ -5,7 +5,7 @@ unit TsLib.NotificationManager;
 interface
 
 uses
-  Classes, SysUtils, TsLib.Connection, TsLib.Types, Logger;
+  Classes, SysUtils, TsLib.Connection, TsLib.Types, syncobjs, Logger;
 
 type
 
@@ -18,7 +18,8 @@ type
     FThreadedNotifications: boolean;
     FConnection: TTsConnection;
     Events: TEventLists;
-    QueuedNotifications: TThreadList;
+    QueuedNotifications: TList;
+    FLocked: TRTLCriticalSection;
     FActive: boolean;
     function GetNotificationsAvailable: Boolean;
     procedure SetActive(AValue: boolean);
@@ -70,10 +71,11 @@ end;
 
 function TNotificationManager.GetNotificationsAvailable: Boolean;
 begin
+  EnterCriticalsection(FLocked);
   try
-    Result:=QueuedNotifications.LockList.Count>0;
+    Result:=QueuedNotifications.Count>0;
   finally
-    QueuedNotifications.UnlockList;
+    LeaveCriticalsection(FLocked);
   end;
 end;
 
@@ -88,24 +90,37 @@ begin
   Result := AnsiStartsStr('notify', Data);
   if not Result then
     exit;
+  WriteStatus('Notification recieved');
   new(n);
   n^.NType := GetNotificationType(Copy(Data, 1, Pos(' ', Data) - 1));
   Delete(Data, 1, Pos(' ', Data));
   n^.Data := Data;
   // Check if already listed (no doubled notifications)
-  lst:=QueuedNotifications.LockList;
+  // Wait at most 2 seconds for semaphore
+  for i:=0 to 20 do
+  begin
+    if FLocked.LockCount=0 then
+      break;
+    sleep(100);
+  end;
+  if FLocked.LockCount>0 then
+  begin
+    Dispose(n);
+    Exit;
+  end;
+  EnterCriticalsection(FLocked);
   try
-    for i:=0 to lst.Count-1 do
-      with PNotificationData(lst[i])^ do
+    for i:=0 to QueuedNotifications.Count-1 do
+      with PNotificationData(QueuedNotifications[i])^ do
         if (NType = n^.NType) and (Data = n^.Data) then
         begin
           Dispose(n);
           Exit;
         end;
-  finally
-    QueuedNotifications.UnlockList;
-  end;
   QueuedNotifications.Add(n);
+  finally
+    LeaveCriticalsection(FLocked);
+  end;
   if FAutoSendNotifications then
     if FConnection.RecieversThreaded and Assigned(FEventThread) and
       not FThreadedNotifications then
@@ -117,7 +132,8 @@ end;
 constructor TNotificationManager.Create(Connection: TTsConnection);
 begin
   FConnection := Connection;
-  QueuedNotifications := TThreadList.Create;
+  QueuedNotifications := TList.Create;
+  InitCriticalSection(FLocked);
   with Events do
   begin
     Texts := TTextEventList.Create;
@@ -157,27 +173,26 @@ procedure TNotificationManager.SendNotifications;
 {$Include include/SendNotifications.inc}
 
 var
-  lst: TList;
   i: integer;
 begin
-  lst := QueuedNotifications.LockList;
+  EnterCriticalsection(FLocked);
   try
-    for i := 0 to lst.Count - 1 do
+    for i := 0 to QueuedNotifications.Count - 1 do
     begin
-      case PNotificationData(lst[i])^.NType of
-        ntTextMessage: SendTM(PNotificationData(lst[i])^);
-        ntServerEdited: SendSE(PNotificationData(lst[i])^);
-        ntClientMoved: SendCM(PNotificationData(lst[i])^);
-        ntClientDisconnected: SendCD(PNotificationData(lst[i])^);
-        ntClientConnected: SendCC(PNotificationData(lst[i])^);
-        ntChannelEdited: SendCE(PNotificationData(lst[i])^);
-        ntChanneldescriptionChanged: SendDC(PNotificationData(lst[i])^);
+      case PNotificationData(QueuedNotifications[i])^.NType of
+        ntTextMessage: SendTM(PNotificationData(QueuedNotifications[i])^);
+        ntServerEdited: SendSE(PNotificationData(QueuedNotifications[i])^);
+        ntClientMoved: SendCM(PNotificationData(QueuedNotifications[i])^);
+        ntClientDisconnected: SendCD(PNotificationData(QueuedNotifications[i])^);
+        ntClientConnected: SendCC(PNotificationData(QueuedNotifications[i])^);
+        ntChannelEdited: SendCE(PNotificationData(QueuedNotifications[i])^);
+        ntChanneldescriptionChanged: SendDC(PNotificationData(QueuedNotifications[i])^);
       end;
     end;
+    QueuedNotifications.Clear;
   finally
-    QueuedNotifications.UnlockList;
+    LeaveCriticalsection(FLocked);
   end;
-  QueuedNotifications.Clear;
 end;
 
 procedure TNotificationManager.Stop;
@@ -185,10 +200,11 @@ var
   cnt: integer;
 begin
   // Send out chached Notifications
+  EnterCriticalsection(FLocked);
   try
-    cnt := QueuedNotifications.LockList.Count;
+    cnt := QueuedNotifications.Count;
   finally
-    QueuedNotifications.UnlockList;
+    LeaveCriticalsection(FLocked);
   end;
   if cnt > 0 then
     SendNotifications;
@@ -226,14 +242,14 @@ var
   i: integer;
   lst: TList;
 begin
-  lst := QueuedNotifications.LockList;
+  EnterCriticalsection(FLocked);
   try
     for i := 0 to lst.Count - 1 do
-      Dispose(PNotificationData(lst[i]));
-  finally
-    QueuedNotifications.UnlockList;
-  end;
+      Dispose(PNotificationData(QueuedNotifications[i]));
   QueuedNotifications.Clear;
+  finally
+    LeaveCriticalsection(FLocked);
+  end;
 end;
 
 procedure TNotificationManager.ClearRegisteredEvents;

@@ -478,6 +478,8 @@ begin
   try
     DoRestart := False;
     FConnection := TTsConnection.Create(FConfig.IPAddress, FConfig.Port);
+    FConnection.RecieverThread:=Self;
+    FConnection.RecieversThreaded:=False;
     FConnection.FloodControl(FConfig.FloodCommands, FConfig.FloodTime);
     with FConnection do
       Result := (Connect() and LogIn(FConfig.Username, FConfig.Password) and
@@ -519,9 +521,9 @@ begin
     WriteStatus('Requesting clientlist');
     FServer.UpdateClientList(FullClientUpdate);
     WriteStatus('Requesting servergroups');
-    //FServer.UpdateServerGroups;
+    FServer.UpdateServerGroups;
     WriteStatus('Requesting channelgroups');
-    //FServer.UpdateChannelGroups;
+    FServer.UpdateChannelGroups;
     FServer.OnChannelUpdate := @ChannelUpdated;
     FServer.OnClientUpdate := @ClientUpdated;
     FServer.OnUpdate := @ServerUpdated;

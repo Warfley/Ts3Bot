@@ -305,8 +305,8 @@ procedure SetConnectionData(AName: String; Value: String; var Connection: TConne
 operator := (Str: string) Channel: TChannelData;
 procedure SetChannelData(AName: String; Value: String; var Channel: TChannelData);
 
-operator := (Str: string) Group: TServerGroup;
-operator := (Str: string) Group: TChannelGroup;
+function CreateServerGroup(Str: String): TServerGroup;
+function CreateChannelGroup(Str: String): TChannelGroup;
 procedure SetGroupData(AName: String; Value: String; var Group: TServerGroup);
 
 function GetNotificationType(Str: string): TNotificationType;
@@ -791,13 +791,13 @@ begin
 end;
 
 
-operator := (Str: string) Group: TServerGroup;
+function CreateServerGroup(Str: String): TServerGroup;
 var
   sl: TStringList;
   i: Integer;
 begin
-  Finalize(Group);
-  FillByte(Group, SizeOf(Group), 0);
+  Finalize(Result);
+  FillByte(Result, SizeOf(Result), 0);
   sl := TStringList.Create;
   try
     sl.Delimiter := ' ';
@@ -805,21 +805,21 @@ begin
     sl.DelimitedText := Str;
     for i:=0 to sl.Count-1 do
       if sl.Names[i]='' then
-        SetGroupData(sl[i], '', Group)
+        SetGroupData(sl[i], '', Result)
       else
-        SetGroupData(sl.Names[i], sl.ValueFromIndex[i], Group);
+        SetGroupData(sl.Names[i], sl.ValueFromIndex[i], Result);
   finally
     sl.Free;
   end;
 end;
 
-operator := (Str: string) Group: TChannelGroup;
+function CreateChannelGroup(Str: String): TChannelGroup;
 var
   sl: TStringList;
   i: Integer;
 begin
-  Finalize(Group);
-  FillByte(Group, SizeOf(Group), 0);
+  Finalize(Result);
+  FillByte(Result, SizeOf(Result), 0);
   sl := TStringList.Create;
   try
     sl.Delimiter := ' ';
@@ -827,9 +827,9 @@ begin
     sl.DelimitedText := Str;
     for i:=0 to sl.Count-1 do
       if sl.Names[i]='' then
-        SetGroupData(sl[i], '', TServerGroup(Group))
+        SetGroupData(sl[i], '', TServerGroup(Result))
       else
-        SetGroupData(sl.Names[i], sl.ValueFromIndex[i], TServerGroup(Group));
+        SetGroupData(sl.Names[i], sl.ValueFromIndex[i], TServerGroup(Result));
   finally
     sl.Free;
   end;
