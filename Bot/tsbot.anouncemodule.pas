@@ -69,13 +69,16 @@ type
     FChannelAnnouncements: TAnnouncementList;
     FNotifications: TNotificationManager;
     FRequiredServerGroups: TStringList;
+    FMessage: String;
   protected
     procedure CheckExpired(Sender: TObject; Data: IntPtr);
     procedure ClientConnected(Sender: TObject; Client: TTsClient);
     procedure ClientMoved(Sender: TObject; Client: TTsClient;
       Source, Target: TTsChannel);
+    procedure DoAnnounce(Sender: TObject; Data: IntPtr);
     // enable/disable Module
     function GetEnabled: boolean; override;
+    procedure SendMessageBack(Sender: TObject; Data: IntPtr);
     procedure SetEnabled(AValue: boolean); override;
     // Returns the name of the module
     function GetName: string; override;
@@ -148,9 +151,22 @@ begin
     FChannelAnnouncements[i].DoAnouncement(Client);
 end;
 
+procedure TAnnouncementModule.DoAnnounce(Sender: TObject; Data: IntPtr);
+var
+  i: Integer;
+begin
+  for i:=0 to FServer.Clients.Count-1 do
+    ClientConnected(Self, FServer.Clients[i]);
+end;
+
 function TAnnouncementModule.GetEnabled: boolean;
 begin
   Result := FEnabled;
+end;
+
+procedure TAnnouncementModule.SendMessageBack(Sender: TObject; Data: IntPtr);
+begin
+  FServer.SendPrivateMessage(FMessage, Data);
 end;
 
 procedure TAnnouncementModule.SetEnabled(AValue: boolean);
@@ -165,10 +181,10 @@ end;
 
 procedure TAnnouncementModule.TextMessage(Sender: TObject; AData: TTextNotification);
 var sl:TStringList;
-  i, x, g: Integer;
+  i, x: Integer;
   n: String;
   c: TTsClient;
-  ReqMet: Boolean;
+  ReqMet, True: Boolean;
   Channel: String;
   SGroups: String;
   CGroups: String;
@@ -208,22 +224,23 @@ begin
 
     if not ReqMet then
     begin
-      c.SendMessage('You require one of the following servergroups to '+
-      'perform this'#10+FRequiredServerGroups.Text);
+      FMessage:='You require one of the following servergroups to '+
+      'perform this'#10+FRequiredServerGroups.Text;
+      FCore.RegisterSchedule(0, @SendMessageBack, AData.Invoker.ID, True);
       Exit;
     end;
 
     if (sl.Count=1) or (sl[1] = 'help') then
     begin
-      FServer.SendPrivateMessage('!announce [channel="channel"]'+
+      FMessage:='!announce [channel="channel"]'+
       ' [cgroups="Group1;Group2;..."] [sgroups="Group1;Group2;..."] '+
       '[type=poke|private] [expires="Time"] message="Textmessage ..."'#10+
       'The time format is "A-B-C-D-E-F-G" with A years B month'+
       ' C days E hours F minutes and G seconds from now on you can cut '+
       ' of leading 0 values'#10+
       'E.g.: !announce sgroups="Guest" expires="5-12-0-0" message="welcome"'#10+
-      'If no type is specified private messages are sent',
-        AData.Invoker.ID);
+      'If no type is specified private messages are sent';
+      FCore.RegisterSchedule(0, @SendMessageBack, AData.Invoker.ID, True);
       Exit;
     end;
     MType:=mtPrivate;
@@ -247,12 +264,14 @@ begin
     for i:=0 to sl.Count-1 do
       if not IsNumeric(sl[i]) then
       begin
-        c.SendMessage('Expirationdate is in the wrong format');
+        FMessage:='Expirationdate is in the wrong format';
+      FCore.RegisterSchedule(0, @SendMessageBack, AData.Invoker.ID, True);
         exit;
       end;
       if Msg='' then
       begin
-        c.SendMessage('No message');
+        FMessage:='No message';
+      FCore.RegisterSchedule(0, @SendMessageBack, AData.Invoker.ID, True);
         exit;
       end;
     if ExpStr='' then
@@ -282,8 +301,7 @@ begin
   finally
     sl.Free;
   end;
-  for i:=0 to FServer.Clients.Count-1 do
-    ClientConnected(Self, FServer.Clients[i]);
+  FCore.RegisterSchedule(0, @DoAnnounce, 0, True);
 end;
 
 constructor TAnnouncementModule.Create(Core: TTBCore);
@@ -448,7 +466,7 @@ end;
 
 function TChannelAnnouncement.CheckUser(Client: TTsClient): boolean;
 begin
-  Result := inherited CheckUser(Client);
+  Result := inherited CheckUser(Client) and Assigned(Client.Channel);
   if not Result then
     exit;
   Result := LowerCase(Client.Channel.ChannelData.Name) = LowerCase(FChannelName);

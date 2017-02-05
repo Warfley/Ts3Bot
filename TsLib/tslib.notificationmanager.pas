@@ -83,7 +83,6 @@ function TNotificationManager.NotificationRecieved(Sender: TObject;
   Data: string; var RemoveFromList: boolean): boolean;
 var
   n: PNotificationData;
-  lst: TList;
   i: Integer;
 begin
   RemoveFromList := False;
@@ -240,11 +239,10 @@ end;
 procedure TNotificationManager.ClearNotifications;
 var
   i: integer;
-  lst: TList;
 begin
   EnterCriticalsection(FLocked);
   try
-    for i := 0 to lst.Count - 1 do
+    for i := 0 to QueuedNotifications.Count - 1 do
       Dispose(PNotificationData(QueuedNotifications[i]));
   QueuedNotifications.Clear;
   finally

@@ -61,6 +61,7 @@ type
     Remaining: int64;
     Code: TDataEvent;
     Data: IntPtr;
+    Once: Boolean;
   end;
 
   TSchedules = specialize TVector<TScheduleInfo>;
@@ -123,7 +124,7 @@ type
   public
     function FindModule(Name: string): TBotModule;
     procedure ClearSchedules;
-    procedure RegisterSchedule(Time: int64; Code: TDataEvent; Data: integer = 0);
+    procedure RegisterSchedule(Time: int64; Code: TDataEvent; Data: integer = 0; Once: Boolean = False);
     procedure RemoveSchedule(Code: TDataEvent; Data: integer = 0);
     procedure Restart;
     procedure RegisterCommand(C: TCommandEventData);
@@ -406,7 +407,8 @@ var
 begin
   EnterCriticalsection(ScheduleCS);
   try
-    for i := 0 to FSchedules.Size - 1 do
+    i:=0;
+    While i < FSchedules.Size do
     begin
       s := FSchedules[i];
       s.Remaining := s.Remaining - Time;
@@ -415,8 +417,14 @@ begin
         if Assigned(s.Code) then
           s.Code(Self, s.Data);
         s.Remaining := s.Time;
+        if s.Once then
+        begin
+          FSchedules.Erase(i);
+          Continue;
+        end;
       end;
       FSchedules[i] := s;
+      inc(i);
     end;
   finally
     LeaveCriticalsection(ScheduleCS);
@@ -478,8 +486,6 @@ begin
   try
     DoRestart := False;
     FConnection := TTsConnection.Create(FConfig.IPAddress, FConfig.Port);
-    FConnection.RecieverThread:=Self;
-    FConnection.RecieversThreaded:=False;
     FConnection.FloodControl(FConfig.FloodCommands, FConfig.FloodTime);
     with FConnection do
       Result := (Connect() and LogIn(FConfig.Username, FConfig.Password) and
@@ -751,7 +757,8 @@ begin
   end;
 end;
 
-procedure TTBCore.RegisterSchedule(Time: int64; Code: TDataEvent; Data: integer);
+procedure TTBCore.RegisterSchedule(Time: int64; Code: TDataEvent;
+  Data: integer; Once: Boolean);
 var
   s: TScheduleInfo;
 begin
@@ -761,6 +768,7 @@ begin
     s.Time := Time;
     s.Remaining := Time;
     s.Data := Data;
+    s.Once:=Once;
     FSchedules.PushBack(s);
   finally
     LeaveCriticalsection(ScheduleCS);

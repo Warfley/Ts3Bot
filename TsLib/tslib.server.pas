@@ -197,10 +197,10 @@ type
     function MoveClient(ClientID: integer; ChannelID: integer): boolean;
     function MoveChannel(ChannelID, ParentID: integer; Order: integer = -1): boolean;
 
-    function SendPrivateMessage(Message: string; ClientID: integer): boolean;
-    function SendChannelMessage(Message: string; ChannelID: integer): boolean;
-    function SendServerMessage(Message: string): boolean;
-    function PokeClient(Message: string; ClientID: integer): boolean;
+    procedure SendPrivateMessage(Message: string; ClientID: integer);
+    procedure SendChannelMessage(Message: string; ChannelID: integer);
+    procedure SendServerMessage(Message: string);
+    procedure PokeClient(Message: string; ClientID: integer);
 
     function ResolveChannelPath(Path: String): TTsChannel;
     function GetChannelPath(Channel: TTsChannel): String;
@@ -1146,60 +1146,28 @@ begin
   end;
 end;
 
-function TTsServer.SendPrivateMessage(Message: string; ClientID: integer): boolean;
-var
-  res: TStatusResponse;
+procedure TTsServer.SendPrivateMessage(Message: string; ClientID: integer);
 begin
-  res := FConnection.ExecCommand(Format('sendtextmessage targetmode=%d target=%d msg=%s',
+  FConnection.SendCommand(Format('sendtextmessage targetmode=%d target=%d msg=%s',
     [1, ClientID, EncodeStr(Message)]));
-  Result := res.ErrNo = 0;
-  if not Result then
-  begin
-    WriteError(res.ErrNo, res.Msg);
-    raise EMessageException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
-  end;
 end;
 
-function TTsServer.SendChannelMessage(Message: string; ChannelID: integer): boolean;
-var
-  res: TStatusResponse;
+procedure TTsServer.SendChannelMessage(Message: string; ChannelID: integer);
 begin
-  res := FConnection.ExecCommand(Format('sendtextmessage targetmode=%d target=%d msg=%s',
+  FConnection.SendCommand(Format('sendtextmessage targetmode=%d target=%d msg=%s',
     [2, ChannelID, EncodeStr(Message)]));
-  Result := res.ErrNo = 0;
-  if not Result then
-  begin
-    WriteError(res.ErrNo, res.Msg);
-    raise EMessageException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
-  end;
 end;
 
-function TTsServer.SendServerMessage(Message: string): boolean;
-var
-  res: TStatusResponse;
+procedure TTsServer.SendServerMessage(Message: string);
 begin
-  res := FConnection.ExecCommand(Format('sendtextmessage targetmode=%d target=%d msg=%s',
+  FConnection.SendCommand(Format('sendtextmessage targetmode=%d target=%d msg=%s',
     [3, FConnection.ServerID, EncodeStr(Message)]));
-  Result := res.ErrNo = 0;
-  if not Result then
-  begin
-    WriteError(res.ErrNo, res.Msg);
-    raise EMessageException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
-  end;
 end;
 
-function TTsServer.PokeClient(Message: string; ClientID: integer): boolean;
-var
-  res: TStatusResponse;
+procedure TTsServer.PokeClient(Message: string; ClientID: integer);
 begin
-  res := FConnection.ExecCommand(Format('clientpoke clid=%d msg=%s',
+  FConnection.SendCommand(Format('clientpoke clid=%d msg=%s',
     [ClientID, EncodeStr(Message)]));
-  Result := res.ErrNo = 0;
-  if not Result then
-  begin
-    WriteError(res.ErrNo, res.Msg);
-    raise EMessageException.Create(Format('Error [%d]: %s', [res.ErrNo, res.Msg]));
-  end;
 end;
 
 function TTsServer.ResolveChannelPath(Path: String): TTsChannel;
