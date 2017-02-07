@@ -9,7 +9,8 @@ uses
   {$ENDIF}{$ENDIF}
   Classes, sysutils, TsBot.core, TsLib.NotificationManager, TsLib.Types,
 TsBotUI.CLI, TsBotUI.Types, Logger, TsLib.Server, TsBot.AfkModule, 
-TsBot.AnounceModule, TsBot.Utils;
+TsBot.AnounceModule, TsBot.Utils, TsBot.AFKGroupModule, TsBot.HelpModule, 
+TsBot.ControlModule, TsBot.NoRecordModule;
 
 var Bot: TTBCore;
 

@@ -115,7 +115,7 @@
         <PackageName Value="indylaz"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="16">
+    <Units Count="20">
       <Unit0>
         <Filename Value="BotApp.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -193,6 +193,26 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="TsBot.Utils"/>
       </Unit15>
+      <Unit16>
+        <Filename Value="..\Bot\tsbot.afkgroupmodule.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsBot.AFKGroupModule"/>
+      </Unit16>
+      <Unit17>
+        <Filename Value="..\Bot\tsbot.helpmodule.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsBot.HelpModule"/>
+      </Unit17>
+      <Unit18>
+        <Filename Value="..\Bot\tsbot.controlmodule.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsBot.ControlModule"/>
+      </Unit18>
+      <Unit19>
+        <Filename Value="..\Bot\tsbot.norecordmodule.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TsBot.NoRecordModule"/>
+      </Unit19>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

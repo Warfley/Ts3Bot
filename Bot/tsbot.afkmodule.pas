@@ -78,15 +78,15 @@ begin
   with Data do
   begin
     if IdleTime >= 0 then
-      Result := Result or (Client.ClientData.IdleTime > IdleTime);
+      Result := Result or (Client.ClientData.IdleTime >= IdleTime);
     if AwayTime >= 0 then
-      Result := Result or ((Client.ClientData.IdleTime > AwayTime) and
+      Result := Result or ((Client.ClientData.IdleTime >= AwayTime) and
         Client.ClientData.IsAway);
     if InMutedTime >= 0 then
-      Result := Result or ((Client.ClientData.IdleTime > InMutedTime) and
+      Result := Result or ((Client.ClientData.IdleTime >= InMutedTime) and
         Client.ClientData.MutedInput);
     if OutMutedTime >= 0 then
-      Result := Result or ((Client.ClientData.IdleTime > OutMutedTime) and
+      Result := Result or ((Client.ClientData.IdleTime >= OutMutedTime) and
         (Client.ClientData.MutedOutput or Client.ClientData.MutedOutputOnly));
   end;
 end;
@@ -174,10 +174,13 @@ begin
   sl := TStringList.Create;
   try
     i := 1;
+
     while i < Length(AData.Message) do
       sl.Add(ReadArgument(AData.Message, i));
+
     if (sl.Count = 0) or (sl[0] <> '!afkmove') then
       exit;
+
     if (sl.Count = 2) then
     begin
       if sl[1] = 'info' then
@@ -190,10 +193,11 @@ begin
                 'inputmuted=%d channel="%s"', [IdleTime, AwayTime,
                 OutMutedTime, InMutedTime, DestinationChannel]);
                 FCore.RegisterSchedule(0, @SendMessage, AData.Invoker.ID, True);
-              break;
+              Exit;
             end;
       end
       else if sl[1] = 'help' then
+      begin
         FMessage:='!afkmove [idle=Time] [inputmuted=Time] ' +
           '[outputmuted=Time] [away=Time] [channel="channel"]'#10 +
           'Where Time specifies the total count of milliseconds before you get' +
@@ -204,12 +208,14 @@ begin
           'and after 5 minutes of muted microphone'#10 +
           'Use !afkmove info to get information about your current settings';
         FCore.RegisterSchedule(0, @SendMessage, AData.Invoker.ID, True);
-      Exit;
+        Exit;
+      end;
     end;
 
     u := -1;
     d := DefaultAfkData;
     d.DestinationChannel := FDefaultAfkName;
+
     for i := 0 to AfkData.Size - 1 do
       if AfkData[i].UID = AData.Invoker.UID then
       begin
