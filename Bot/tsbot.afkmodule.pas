@@ -116,16 +116,21 @@ begin
         if inAfk and (LastChannel > 0) and not doMove then
           //in afk channel but requirement not met
         begin
+          WriteStatus('Moving '+Client.ClientData.Name+' back');
           Client.Channel := FServer.GetChannelByID(LastChannel);
           LastChannel := 0;
         end
         else if not inAfk and doMove then
         begin
+          WriteStatus('Moving '+Client.ClientData.Name+' to afk');
           LastChannel := Client.ClientData.ChannelID;
           Client.Channel := FServer.GetChannelByID(tc);
         end
-        else if not inAfk and not doMove then
+        else if not inAfk and not doMove and (LastChannel>0) then
+        begin
+          WriteStatus('User moved out of AFK');
           LastChannel := 0;
+        end;
       end;
     AfkData[i] := d;
   end;
@@ -133,6 +138,7 @@ end;
 
 function TAfkModule.GetEnabled: boolean;
 begin
+  WriteStatus('Enabled AFK move');
   Result := FEnabled;
 end;
 
@@ -143,6 +149,7 @@ end;
 
 procedure TAfkModule.SetEnabled(AValue: boolean);
 begin
+  WriteStatus('Disabled AFK move');
   FEnabled := AValue;
 end;
 

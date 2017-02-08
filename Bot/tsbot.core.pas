@@ -637,6 +637,7 @@ end;
 procedure TTBCore.UpdateChannelGroups(Sender: TObject; Data: IntPtr);
 begin
   try
+    WriteStatus('Updateing channelgroups');
     FServer.UpdateChannelGroups;
   except
     on E: EChannelDataException do ;
@@ -646,7 +647,8 @@ end;
 procedure TTBCore.UpdateChannels(Sender: TObject; Data: IntPtr);
 begin
   try
-    FServer.UpdateChannelList;
+    WriteStatus('Updateing channellist');
+    FServer.UpdateChannelList(FChannelUpdate);
   except
     on E: EChannelDataException do ;
   end;
@@ -655,7 +657,8 @@ end;
 procedure TTBCore.UpdateClients(Sender: TObject; Data: IntPtr);
 begin
   try
-    FServer.UpdateClientList;
+    WriteStatus('Updating clientlist');
+    FServer.UpdateClientList(FClientUpdate);
   except
     on E: EClientDataException do ;
   end;
@@ -664,6 +667,7 @@ end;
 procedure TTBCore.UpdateServer(Sender: TObject; Data: IntPtr);
 begin
   try
+    WriteStatus('Updating serverinfo');
     FServer.UpdateServerData;
   except
     on E: EServerDataException do ;
@@ -728,6 +732,7 @@ end;
 procedure TTBCore.UpdateServerGroups(Sender: TObject; Data: IntPtr);
 begin
   try
+    WriteStatus('Updateing servergroups');
     FServer.UpdateServerGroups;
   except
     on E: EServerDataException do ;
