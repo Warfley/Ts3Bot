@@ -460,6 +460,7 @@ procedure TTBCore.ClientMoved(Sender: TObject; Client: TTsClient;
 var
   i: integer;
 begin
+  WriteStatus('Client '+Client.ClientData.Name+' moved');
   for i := 0 to ClientMoveEvents.Count - 1 do
     ClientMoveEvents[i](Sender, Client, Source, Target);
 end;

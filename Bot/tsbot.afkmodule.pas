@@ -138,7 +138,6 @@ end;
 
 function TAfkModule.GetEnabled: boolean;
 begin
-  WriteStatus('Enabled AFK move');
   Result := FEnabled;
 end;
 
@@ -149,7 +148,7 @@ end;
 
 procedure TAfkModule.SetEnabled(AValue: boolean);
 begin
-  WriteStatus('Disabled AFK move');
+  WriteStatus('AFK move Enabled changed');
   FEnabled := AValue;
 end;
 

@@ -93,20 +93,8 @@ begin
   new(n);
   n^.NType := GetNotificationType(Copy(Data, 1, Pos(' ', Data) - 1));
   Delete(Data, 1, Pos(' ', Data));
-  n^.Data := Data;
+  n^.Data := StringReplace(Data, #10#13,' ', [rfReplaceAll]);
   // Check if already listed (no doubled notifications)
-  // Wait at most 2 seconds for semaphore
-  for i:=0 to 20 do
-  begin
-    if FLocked.LockCount=0 then
-      break;
-    sleep(100);
-  end;
-  if FLocked.LockCount>0 then
-  begin
-    Dispose(n);
-    Exit;
-  end;
   EnterCriticalsection(FLocked);
   try
     for i:=0 to QueuedNotifications.Count-1 do
