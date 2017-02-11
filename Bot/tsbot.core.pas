@@ -92,6 +92,8 @@ type
     FClientUpdate: TClientUpdates;
     FChannelUpdate: TChannelUpdates;
     function GetConfig: TConfig;
+    function GetModule(Index: Integer): TBotModule;
+    function GetModuleCount: Integer;
     procedure SetAutoRestart(AValue: boolean);
     procedure SleepAndCheck(Time: integer; Step: integer = 100);
     procedure RunCommands;
@@ -143,6 +145,9 @@ type
     procedure UnregisterConnectedEvent(Event: TClientConnectedEvent);
     procedure UnregisterDisconnectedEvent(Event: TClientDisconnectedEvent);
     procedure UnregisterMoveEvent(Event: TClientMoveEvent);
+
+    property ModuleCount: Integer read GetModuleCount;
+    property Module[Index: Integer]: TBotModule read GetModule;
     property Config: TConfig read GetConfig;
     property AutoRestart: boolean read FAutoRestart write SetAutoRestart;
     property IdleToTerminate: boolean read FIdleToTerminate write FIdleToTerminate;
@@ -155,7 +160,7 @@ type
 
 implementation
 
-uses TsBot.AfkModule, TsBot.AnounceModule;
+uses TsBot.AfkModule, TsBot.AnounceModule, TsBot.HelpModule;
 
 { TTBCore }
 
@@ -189,6 +194,18 @@ begin
   finally
     LeaveCriticalsection(ConfigCS);
   end;
+end;
+
+function TTBCore.GetModule(Index: Integer): TBotModule;
+begin
+  Result:=nil;
+  if (Index<0) or (Index>=Modules.Count) then exit;
+  Result:=Modules[Index];
+end;
+
+function TTBCore.GetModuleCount: Integer;
+begin
+  Result:=Modules.Count;
 end;
 
 procedure TTBCore.RunCommands;
@@ -696,6 +713,7 @@ procedure TTBCore.RegisterModules;
 begin
   Modules.Add(TAfkModule.Create(Self));
   Modules.Add(TAnnouncementModule.Create(Self));
+  Modules.Add(THelpModule.Create(Self));
 end;
 
 procedure TTBCore.InitModules;

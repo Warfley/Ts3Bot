@@ -36,6 +36,7 @@ type
     FMessage: String;
     function CheckForMove(Client: TTsClient; Data: TAfkData): boolean;
   protected
+    procedure ClientConnected(Sender: TObject; Client: TTsClient);
     procedure ClientUpdated(Sender: TObject; Client: TTsClient);
     // enable/disable Module
     function GetEnabled: boolean; override;
@@ -89,6 +90,19 @@ begin
       Result := Result or ((Client.ClientData.IdleTime >= OutMutedTime) and
         (Client.ClientData.MutedOutput or Client.ClientData.MutedOutputOnly));
   end;
+end;
+
+procedure TAfkModule.ClientConnected(Sender: TObject; Client: TTsClient);
+var i: Integer;
+  d: TAfkData;
+begin
+  for i:=0 to AfkData.Size-1 do
+    if AfkData[i].UID = Client.ClientData.UID then
+    begin
+      d:=AfkData[i];
+      d.LastChannel:=0;
+      AfkData[i]:=d;
+    end;
 end;
 
 procedure TAfkModule.ClientUpdated(Sender: TObject; Client: TTsClient);
@@ -278,6 +292,7 @@ begin
 
   FNotifications.RegisterText(@TextMessage);
   FCore.RegisterClientUpdateEvent(@ClientUpdated);
+  FCore.RegisterClientConnectEvent(@ClientConnected);
   FCore.ClientUpdate := FCore.ClientUpdate + [clVoice, clTimes, clUID, clAway];
 end;
 
@@ -285,6 +300,7 @@ procedure TAfkModule.DoneModule;
 begin
   FNotifications.UnregisterNotification(ntTextMessage, TMethod(@TextMessage));
   FCore.UnregisterUpdateEvent(@ClientUpdated);
+  FCore.UnregisterConnectedEvent(@ClientConnected);
 end;
 
 procedure TAfkModule.ReadConfig(doc: TXMLDocument);

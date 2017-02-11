@@ -232,7 +232,7 @@ begin
   try
     for i := 0 to QueuedNotifications.Count - 1 do
       Dispose(PNotificationData(QueuedNotifications[i]));
-  QueuedNotifications.Clear;
+    QueuedNotifications.Clear;
   finally
     LeaveCriticalsection(FLocked);
   end;
