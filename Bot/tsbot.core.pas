@@ -106,6 +106,7 @@ type
     procedure ClientMoved(Sender: TObject; Client: TTsClient;
       Source, Target: TTsChannel);
     procedure ClientUpdated(Sender: TObject; Client: TTsClient);
+    procedure ScheduleRestart(Sender: TObject; Data: IntPtr);
     procedure ServerUpdated(Sender: TObject);
     { Protected declarations }
     function SetUp: boolean;
@@ -490,6 +491,11 @@ begin
     ClientUpdateEvents[i](Sender, Client);
 end;
 
+procedure TTBCore.ScheduleRestart(Sender: TObject; Data: IntPtr);
+begin
+  Restart;
+end;
+
 procedure TTBCore.ServerUpdated(Sender: TObject);
 var
   i: integer;
@@ -566,6 +572,7 @@ begin
       RegisterSchedule(Config.UpdateServerGroups, @UpdateServerGroups);
     if Config.UpdateChannelGroups >= 0 then
       RegisterSchedule(Config.UpdateChannelGroups, @UpdateChannelGroups);
+    RegisterSchedule(Hour*2, @ScheduleRestart);
 
     // save config every 30 minutes
     RegisterSchedule(Minutes30, @SaveConfig);
