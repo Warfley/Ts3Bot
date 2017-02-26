@@ -17,12 +17,12 @@ type
   private
   protected
     FUsersSend: TStringList;
-    FMessage: string;
     FType: TMessageType;
     FServer: TTsServer;
     FExpirationDate: TDateTime;
     FServerGroups: TStringList;
     FChannelGroups: TStringList;
+    FMessage: String;
     function GetExpired: boolean; virtual;
     function CheckUser(Client: TTsClient): boolean; virtual;
   public
@@ -64,12 +64,10 @@ type
     FEnabled: boolean;
     FConnection: TTsConnection;
     FServer: TTsServer;
-    FCore: TTBCore;
     FServerAnnouncements: TAnnouncementList;
     FChannelAnnouncements: TAnnouncementList;
     FNotifications: TNotificationManager;
     FRequiredServerGroups: TStringList;
-    FMessage: String;
   protected
     procedure CheckExpired(Sender: TObject; Data: IntPtr);
     procedure ClientConnected(Sender: TObject; Client: TTsClient);
@@ -78,7 +76,6 @@ type
     procedure DoAnnounce(Sender: TObject; Data: IntPtr);
     // enable/disable Module
     function GetEnabled: boolean; override;
-    procedure SendMessageBack(Sender: TObject; Data: IntPtr);
     procedure SetEnabled(AValue: boolean); override;
     // Returns the name of the module
     function GetName: string; override;
@@ -164,11 +161,6 @@ begin
   Result := FEnabled;
 end;
 
-procedure TAnnouncementModule.SendMessageBack(Sender: TObject; Data: IntPtr);
-begin
-  FServer.SendPrivateMessage(FMessage, Data);
-end;
-
 procedure TAnnouncementModule.SetEnabled(AValue: boolean);
 begin
   FEnabled := AValue;
@@ -224,23 +216,21 @@ begin
 
     if not ReqMet then
     begin
-      FMessage:='You require one of the following servergroups to '+
-      'perform this'#10+FRequiredServerGroups.Text;
-      FCore.RegisterSchedule(0, @SendMessageBack, AData.Invoker.ID, True);
+      SendPrivateMessage(FServer,'You require one of the following servergroups to '+
+      'perform this'#10+FRequiredServerGroups.Text, AData.Invoker.ID);
       Exit;
     end;
 
     if (sl.Count=1) or (sl[1] = 'help') then
     begin
-      FMessage:='!announce [channel="channel"]'+
+      SendPrivateMessage(FServer, '!announce [channel="channel"]'+
       ' [cgroups="Group1;Group2;..."] [sgroups="Group1;Group2;..."] '+
       '[type=poke|private] [expires="Time"] message="Textmessage ..."'#10+
       'The time format is "A-B-C-D-E-F-G" with A years B month'+
       ' C days E hours F minutes and G seconds from now on you can cut '+
       ' of leading 0 values'#10+
       'E.g.: !announce sgroups="Guest" expires="5-12-0-0" message="welcome"'#10+
-      'If no type is specified private messages are sent';
-      FCore.RegisterSchedule(0, @SendMessageBack, AData.Invoker.ID, True);
+      'If no type is specified private messages are sent', AData.Invoker.ID);
       Exit;
     end;
     MType:=mtPrivate;
@@ -264,14 +254,13 @@ begin
     for i:=0 to sl.Count-1 do
       if not IsNumeric(sl[i]) then
       begin
-        FMessage:='Expirationdate is in the wrong format';
-      FCore.RegisterSchedule(0, @SendMessageBack, AData.Invoker.ID, True);
+        SendPrivateMessage(FServer, 'Expirationdate is in the wrong format',
+        AData.Invoker.ID);
         exit;
       end;
       if Msg='' then
       begin
-        FMessage:='No message';
-      FCore.RegisterSchedule(0, @SendMessageBack, AData.Invoker.ID, True);
+        SendPrivateMessage(FServer, 'No message', AData.Invoker.ID);
         exit;
       end;
     if ExpStr='' then

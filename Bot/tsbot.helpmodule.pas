@@ -14,7 +14,6 @@ type
 
   THelpModule = class(TBotModule)
   private
-    FCore: TTBCore;
     FEnabled: Boolean;
   protected
     procedure SendHelp(Sender: TObject; Data: IntPtr);

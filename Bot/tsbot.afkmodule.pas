@@ -29,18 +29,15 @@ type
     FEnabled: boolean;
     FConnection: TTsConnection;
     FServer: TTsServer;
-    FCore: TTBCore;
     FDefaultAfkName: string;
     FNotifications: TNotificationManager;
     AfkData: TAfkDataList;
-    FMessage: String;
     function CheckForMove(Client: TTsClient; Data: TAfkData): boolean;
   protected
     procedure ClientConnected(Sender: TObject; Client: TTsClient);
     procedure ClientUpdated(Sender: TObject; Client: TTsClient);
     // enable/disable Module
     function GetEnabled: boolean; override;
-    procedure SendMessage(Sender: TObject; Data: IntPtr);
     procedure SetEnabled(AValue: boolean); override;
     // Returns the name of the module
     function GetName: string; override;
@@ -155,11 +152,6 @@ begin
   Result := FEnabled;
 end;
 
-procedure TAfkModule.SendMessage(Sender: TObject; Data: IntPtr);
-begin
-  FServer.SendPrivateMessage(FMessage, Data);
-end;
-
 procedure TAfkModule.SetEnabled(AValue: boolean);
 begin
   WriteStatus('AFK move Enabled changed');
@@ -209,16 +201,16 @@ begin
           if AfkData[i].UID = AData.Invoker.UID then
             with AfkData[i] do
             begin
-              FMessage:=Format('idle=%d away=%d outputmuted=%d ' +
+              SendPrivateMessage(FServer, Format('idle=%d away=%d outputmuted=%d ' +
                 'inputmuted=%d channel="%s"', [IdleTime, AwayTime,
-                OutMutedTime, InMutedTime, DestinationChannel]);
-                FCore.RegisterSchedule(0, @SendMessage, AData.Invoker.ID, True);
+                OutMutedTime, InMutedTime, DestinationChannel]),
+                AData.Invoker.ID);
               Exit;
             end;
       end
       else if sl[1] = 'help' then
       begin
-        FMessage:='!afkmove [idle=Time] [inputmuted=Time] ' +
+        SendPrivateMessage(FServer, '!afkmove [idle=Time] [inputmuted=Time] ' +
           '[outputmuted=Time] [away=Time] [channel="channel"]'#10 +
           'Where Time specifies the total count of milliseconds before you get' +
           ' moved. "channel" defines the channel you will be moved to (Default: ' +
@@ -226,8 +218,8 @@ begin
           #10#10'Example: !afkmove outputmuted=0 away=0 inputmuted=300000'#10 +
           'This will move you on muting you sound or setting away status directly' +
           'and after 5 minutes of muted microphone'#10 +
-          'Use !afkmove info to get information about your current settings';
-        FCore.RegisterSchedule(0, @SendMessage, AData.Invoker.ID, True);
+          'Use !afkmove info to get information about your current settings',
+          AData.Invoker.ID);
         Exit;
       end;
     end;

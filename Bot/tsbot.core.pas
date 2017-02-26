@@ -23,17 +23,28 @@ uses
 type
   TTBCore = class;
 
-  { TTBCore }
+  PUserMessageInfo = ^TUserMessageInfo;
+  TUserMessageInfo = record
+    User: Integer;
+    Message: String;
+    Server: TTsServer;
+  end;
+
+  { TBotModule }
 
   TBotModule = class
+  private
+    procedure DoSendPrivate(Sender: TObject; Data: IntPtr);
   protected
+    FCore: TTBCore;
     // enable/disable Module
     function GetEnabled: boolean; virtual; abstract;
     procedure SetEnabled(AValue: boolean); virtual; abstract;
     // Returns the name of the module
     function GetName: string; virtual; abstract;
+    procedure SendPrivateMessage(Server: TTsServer; Message: String; Client: Integer); virtual;
   public
-    constructor Create(Core: TTBCore); virtual; abstract;
+    constructor Create(Core: TTBCore); virtual;
 
     // Called after the serverdata is collected
     procedure InitModule; virtual; abstract;
@@ -127,7 +138,7 @@ type
   public
     function FindModule(Name: string): TBotModule;
     procedure ClearSchedules;
-    procedure RegisterSchedule(Time: int64; Code: TDataEvent; Data: integer = 0; Once: Boolean = False);
+    procedure RegisterSchedule(Time: int64; Code: TDataEvent; Data: IntPtr = 0; Once: Boolean = False);
     procedure RemoveSchedule(Code: TDataEvent; Data: integer = 0);
     procedure Restart;
     procedure RegisterCommand(C: TCommandEventData);
@@ -162,6 +173,34 @@ type
 implementation
 
 uses TsBot.AfkModule, TsBot.AnounceModule, TsBot.HelpModule;
+
+{ TBotModule }
+
+procedure TBotModule.DoSendPrivate(Sender: TObject; Data: IntPtr);
+var
+  pmsg: PUserMessageInfo;
+begin
+  pmsg:=PUserMessageInfo(Data);
+  pmsg^.Server.SendPrivateMessage(pmsg^.Message, pmsg^.User);
+  Dispose(pmsg);
+end;
+
+procedure TBotModule.SendPrivateMessage(Server: TTsServer; Message: String;
+  Client: Integer);
+var
+  pmsg: PUserMessageInfo;
+begin
+  new(pmsg);
+  pmsg^.Message:=Message;
+  pmsg^.Server:=Server;
+  pmsg^.User:=Client;
+  FCore.RegisterSchedule(0, @DoSendPrivate, IntPtr(pmsg), True);
+end;
+
+constructor TBotModule.Create(Core: TTBCore);
+begin
+  FCore:=Core;
+end;
 
 { TTBCore }
 
@@ -788,8 +827,8 @@ begin
   end;
 end;
 
-procedure TTBCore.RegisterSchedule(Time: int64; Code: TDataEvent;
-  Data: integer; Once: Boolean);
+procedure TTBCore.RegisterSchedule(Time: int64; Code: TDataEvent; Data: IntPtr;
+  Once: Boolean);
 var
   s: TScheduleInfo;
 begin
