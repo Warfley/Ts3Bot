@@ -613,7 +613,7 @@ begin
     if Config.UpdateChannelGroups >= 0 then
       RegisterSchedule(Config.UpdateChannelGroups, @UpdateChannelGroups);
 
-    RegisterSchedule(Hour, @ScheduleRestart);
+    RegisterSchedule(Minutes30, @ScheduleRestart);
 
     // save config every 30 minutes
     RegisterSchedule(Minutes30, @SaveConfig);

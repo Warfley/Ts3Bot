@@ -16,6 +16,8 @@ type
 
   TLastCommandList = specialize TVector<TLastCommand>;
 
+  { TBotControlModule }
+
   TBotControlModule = class(TBotModule)
   private
     FEnabled: Boolean;
@@ -49,6 +51,79 @@ type
   end;
 
 implementation
+
+{ TBotControlModule }
+
+function TBotControlModule.GetEnabled: boolean;
+begin
+
+end;
+
+procedure TBotControlModule.SetEnabled(AValue: boolean);
+begin
+
+end;
+
+function TBotControlModule.GetName: string;
+begin
+
+end;
+
+procedure TBotControlModule.TextMessage(Sender: TObject;
+  AData: TTextNotification);
+begin
+
+end;
+
+constructor TBotControlModule.Create(Core: TTBCore);
+begin
+  inherited Create(Core);
+end;
+
+destructor TBotControlModule.Destroy;
+begin
+  inherited Destroy;
+end;
+
+procedure TBotControlModule.InitModule;
+begin
+
+end;
+
+procedure TBotControlModule.DoneModule;
+begin
+
+end;
+
+procedure TBotControlModule.ReadConfig(doc: TXMLDocument);
+begin
+
+end;
+
+procedure TBotControlModule.WriteConfig(doc: TXMLDocument);
+begin
+
+end;
+
+function TBotControlModule.GetHelp: string;
+begin
+
+end;
+
+function TBotControlModule.ConfigModule(Config: TStringList): boolean;
+begin
+
+end;
+
+procedure TBotControlModule.GetConfigItems(Sl: TStringList);
+begin
+
+end;
+
+procedure TBotControlModule.GetConfig(SL: TStringList);
+begin
+
+end;
 
 end.
 

@@ -90,15 +90,16 @@ begin
 end;
 
 procedure TAfkModule.ClientConnected(Sender: TObject; Client: TTsClient);
-var i: Integer;
+var
+  i: integer;
   d: TAfkData;
 begin
-  for i:=0 to AfkData.Size-1 do
+  for i := 0 to AfkData.Size - 1 do
     if AfkData[i].UID = Client.ClientData.UID then
     begin
-      d:=AfkData[i];
-      d.LastChannel:=0;
-      AfkData[i]:=d;
+      d := AfkData[i];
+      d.LastChannel := 0;
+      AfkData[i] := d;
     end;
 end;
 
@@ -112,39 +113,40 @@ var
 begin
   if not Enabled then
     exit;
-  for i := 0 to AfkData.Size - 1 do
-  begin
-    d := AfkData[i];
-    with d do
-      if Client.ClientData.UID = UID then
-      begin
-        c := FServer.ResolveChannelPath(DestinationChannel);
-        if not Assigned(c) then
-          Continue;
-        tc := c.ChannelData.ID;
-        doMove := CheckForMove(Client, AfkData[i]);
-        inAfk := (tc = Client.ClientData.ChannelID);
-        if inAfk and (LastChannel > 0) and not doMove then
-          //in afk channel but requirement not met
+  if AfkData.Size > 0 then
+    for i := 0 to AfkData.Size - 1 do
+    begin
+      d := AfkData[i];
+      with d do
+        if Client.ClientData.UID = UID then
         begin
-          WriteStatus('Moving '+Client.ClientData.Name+' back');
-          Client.Channel := FServer.GetChannelByID(LastChannel);
-          LastChannel := 0;
-        end
-        else if not inAfk and doMove then
-        begin
-          WriteStatus('Moving '+Client.ClientData.Name+' to afk');
-          LastChannel := Client.ClientData.ChannelID;
-          Client.Channel := FServer.GetChannelByID(tc);
-        end
-        else if not inAfk and not doMove and (LastChannel>0) then
-        begin
-          WriteStatus('User moved out of AFK');
-          LastChannel := 0;
+          c := FServer.ResolveChannelPath(DestinationChannel);
+          if not Assigned(c) then
+            Continue;
+          tc := c.ChannelData.ID;
+          doMove := CheckForMove(Client, AfkData[i]);
+          inAfk := (tc = Client.ClientData.ChannelID);
+          if inAfk and (LastChannel > 0) and not doMove then
+            //in afk channel but requirement not met
+          begin
+            WriteStatus('Moving ' + Client.ClientData.Name + ' back');
+            Client.Channel := FServer.GetChannelByID(LastChannel);
+            LastChannel := 0;
+          end
+          else if not inAfk and doMove then
+          begin
+            WriteStatus('Moving ' + Client.ClientData.Name + ' to afk');
+            LastChannel := Client.ClientData.ChannelID;
+            Client.Channel := FServer.GetChannelByID(tc);
+          end
+          else if not inAfk and not doMove and (LastChannel > 0) then
+          begin
+            WriteStatus('User moved out of AFK');
+            LastChannel := 0;
+          end;
         end;
-      end;
-    AfkData[i] := d;
-  end;
+      AfkData[i] := d;
+    end;
 end;
 
 function TAfkModule.GetEnabled: boolean;
@@ -201,9 +203,9 @@ begin
           if AfkData[i].UID = AData.Invoker.UID then
             with AfkData[i] do
             begin
-              SendPrivateMessage(FServer, Format('idle=%d away=%d outputmuted=%d ' +
-                'inputmuted=%d channel="%s"', [IdleTime, AwayTime,
-                OutMutedTime, InMutedTime, DestinationChannel]),
+              SendPrivateMessage(FServer,
+                Format('idle=%d away=%d outputmuted=%d ' + 'inputmuted=%d channel="%s"',
+                [IdleTime, AwayTime, OutMutedTime, InMutedTime, DestinationChannel]),
                 AData.Invoker.ID);
               Exit;
             end;
@@ -369,19 +371,19 @@ begin
 
   Parent.AttribStrings['ChannelName'] := FDefaultAfkName;
   Parent.AttribStrings['Enabled'] := BoolToStr(FEnabled, '1', '0');
+  if AfkData.Size > 0 then
+    for i := 0 to AfkData.Size - 1 do
+    begin
+      Node := doc.CreateElement('User');
+      Parent.AppendChild(Node);
 
-  for i := 0 to AfkData.Size - 1 do
-  begin
-    Node := doc.CreateElement('User');
-    Parent.AppendChild(Node);
-
-    Node.AttribStrings['UID'] := AfkData[i].UID;
-    Node.AttribStrings['DestinationChannel'] := AfkData[i].DestinationChannel;
-    Node.AttribStrings['IdleTime'] := IntToStr(AfkData[i].IdleTime);
-    Node.AttribStrings['InMutedTime'] := IntToStr(AfkData[i].InMutedTime);
-    Node.AttribStrings['OutMutedTime'] := IntToStr(AfkData[i].OutMutedTime);
-    Node.AttribStrings['AwayTime'] := IntToStr(AfkData[i].AwayTime);
-  end;
+      Node.AttribStrings['UID'] := AfkData[i].UID;
+      Node.AttribStrings['DestinationChannel'] := AfkData[i].DestinationChannel;
+      Node.AttribStrings['IdleTime'] := IntToStr(AfkData[i].IdleTime);
+      Node.AttribStrings['InMutedTime'] := IntToStr(AfkData[i].InMutedTime);
+      Node.AttribStrings['OutMutedTime'] := IntToStr(AfkData[i].OutMutedTime);
+      Node.AttribStrings['AwayTime'] := IntToStr(AfkData[i].AwayTime);
+    end;
 
 end;
 
