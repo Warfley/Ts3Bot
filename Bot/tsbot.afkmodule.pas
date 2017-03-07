@@ -264,7 +264,7 @@ end;
 
 constructor TAfkModule.Create(Core: TTBCore);
 begin
-  FCore := Core;
+  inherited Create(Core);
   AfkData := TAfkDataList.Create;
   FEnabled := True;
   FDefaultAfkName := 'AFK';

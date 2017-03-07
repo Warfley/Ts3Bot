@@ -295,10 +295,10 @@ end;
 
 constructor TAnnouncementModule.Create(Core: TTBCore);
 begin
+  inherited Create(Core);
   FRequiredServerGroups := TStringList.Create;
   FServerAnnouncements := TAnnouncementList.Create(True);
   FChannelAnnouncements := TAnnouncementList.Create(True);
-  FCore := Core;
 end;
 
 destructor TAnnouncementModule.Destroy;
