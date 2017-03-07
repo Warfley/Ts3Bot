@@ -532,6 +532,7 @@ end;
 
 procedure TTBCore.ScheduleRestart(Sender: TObject; Data: IntPtr);
 begin
+  WriteStatus('Scheduled Restart');
   Restart;
 end;
 
@@ -611,7 +612,8 @@ begin
       RegisterSchedule(Config.UpdateServerGroups, @UpdateServerGroups);
     if Config.UpdateChannelGroups >= 0 then
       RegisterSchedule(Config.UpdateChannelGroups, @UpdateChannelGroups);
-    RegisterSchedule(Hour*2, @ScheduleRestart);
+
+    RegisterSchedule(Hour, @ScheduleRestart);
 
     // save config every 30 minutes
     RegisterSchedule(Minutes30, @SaveConfig);
@@ -701,7 +703,6 @@ end;
 procedure TTBCore.UpdateChannelGroups(Sender: TObject; Data: IntPtr);
 begin
   try
-    WriteStatus('Updateing channelgroups');
     FServer.UpdateChannelGroups;
   except
     on E: EChannelDataException do ;
@@ -711,7 +712,6 @@ end;
 procedure TTBCore.UpdateChannels(Sender: TObject; Data: IntPtr);
 begin
   try
-    WriteStatus('Updateing channellist');
     FServer.UpdateChannelList(FChannelUpdate);
   except
     on E: EChannelDataException do ;
@@ -721,7 +721,6 @@ end;
 procedure TTBCore.UpdateClients(Sender: TObject; Data: IntPtr);
 begin
   try
-    WriteStatus('Updating clientlist');
     FServer.UpdateClientList(FClientUpdate);
   except
     on E: EClientDataException do ;
@@ -731,7 +730,6 @@ end;
 procedure TTBCore.UpdateServer(Sender: TObject; Data: IntPtr);
 begin
   try
-    WriteStatus('Updating serverinfo');
     FServer.UpdateServerData;
   except
     on E: EServerDataException do ;
